@@ -105,8 +105,8 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 	_, _, _, _, lats, lons, w_cs, cs = get_L2_data(filename)
 	
 	if local_grid:
-		latitudes = np.arange(np.amin(lats), np.amax(lats), local_space)
-		longitudes = np.arange(np.amin(lons), np.amax(lons), local_space)
+		latitudes = np.arange(np.amin(lats)*1.1, np.amax(lats)*1.1, local_space)
+		longitudes = np.arange(np.amin(lons)*1.1, np.amax(lons)*1.1, local_space)
 		default_grid = {'lats': latitudes, 'lons': longitudes}
 	
 	#place lls in grid
@@ -117,7 +117,7 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 	lon_idxs = find_lons(lons)
 	
 	#create grids based on given info
-	wc_grid = [ [ [] for i in range(len(default_grid['lons']))] for j in range(len(default_grid['lats']))]
+	wc_grid = [ [ [] for i in range(len(default_grid['lons'])-1)] for j in range(len(default_grid['lats'])-1)]
 	c_grid = copy.deepcopy(wc_grid)
 	
 	#assign flag values to grid cells to find each grid cell's CF
@@ -125,7 +125,7 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 		for j in range(len(lat_idxs[0])):
 			try:
 				wc_grid[lat_idxs[i][j]][lon_idxs[i][j]].append(w_cs[i][j])
-				#c_grid[lat_idxs[i][j]][lon_idxs[i][j]].append(cs[i][j])
+				c_grid[lat_idxs[i][j]][lon_idxs[i][j]].append(cs[i][j])
 			except IndexError:
 				print(wc_grid[lat_idxs[i][j]][lon_idxs[i][j]])
 				print(i, j, w_cs[i][j])
@@ -139,8 +139,10 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 			for j in range(len(wc_grid[0])):
 				if len(wc_grid[i][j]) > 0:
 					wc_grid[i][j] = np.nanmean(wc_grid[i][j])
+					c_grid[i][j] = np.nanmean(c_grid[i][j])
 				else:
 					wc_grid[i][j] = 0.
+					c_grid[i][j] = 0.
 	
 	
 	return np.array(wc_grid), np.array(c_grid), default_grid

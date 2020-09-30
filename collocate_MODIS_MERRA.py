@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import load_l2_MODIS
 import datetime
 import glob
+import copy
 
 merra_dir = '/gws/nopw/j04/eo_shared_data_vol1/reanalysis/MERRA-2/'
 
@@ -32,22 +33,35 @@ for filename in modis_daily:
 	
 	print('creating tree')
 	X = []
-	for lat in merra_data['lats']:
-		for lon in merra_data['lons']:
+	merra_idxs = []
+	for i, lat in enumerate(merra_data['lats']):
+		for j, lon in enumerate(merra_data['lons']):
 			X.append(np.array([lat, lon]))
+			merra_idxs.append([i, j])
 	X = np.array(X)
-	print(X.shape)
+	
 	merra_kdtree = KDTree(X)
-	modis_points = []
+	lts_grid = copy.deepcopy(warm_frac)
 	for i in range(len(warm_frac)):
 		for j in range(len(warm_frac[i])):
-			modis_points.append(np.array([modis_lats[i], modis_lons[j]]))
 			test = np.array([np.array([modis_lats[i], modis_lons[j]])])
 			d, idx = merra_kdtree.query(test)
-			print(modis_lats[i], modis_lons[j])
-			print(X[idx[0]])
+			merra_point = X[idx[0]][0]
+			merra_x = list(merra_data['lats']).index(merra_point[0])
+			merra_y = list(merra_data['lons']).index(merra_point[1])
+			lts_grid[i][j] = merra_data['EIS'][corr_merra_t][merra_x][merra_y]
 			
-		break
+	
+	plt.subplot(131)
+	plt.title('LTS')
+	plt.pcolormesh(lts_grid)
+	plt.colorbar()
+	plt.subplot(132)
+	plt.title('All CF')
+	plt.pcolormesh(all_frac, vmin = 0, vmax = 1.)
+	plt.colorbar()
+	plt.subplot(133)
+	plt.title('Warm CF')
+	plt.pcolormesh(warm_frac, vmin = 0, vmax = 1.)
+	plt.show()
 	break
-	
-	
