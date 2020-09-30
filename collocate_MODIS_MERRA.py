@@ -30,19 +30,24 @@ for filename in modis_daily:
 	merra_filename = merra_dir + date.strftime('%d_%m_%Y.npy')
 	merra_data = np.load(merra_filename).item()
 	
-	print('creting tree')
+	print('creating tree')
 	X = []
 	for lat in merra_data['lats']:
 		for lon in merra_data['lons']:
-			X.append([lat, lon])
+			X.append(np.array([lat, lon]))
 	X = np.array(X)
 	print(X.shape)
 	merra_kdtree = KDTree(X)
+	modis_points = []
 	for i in range(len(warm_frac)):
 		for j in range(len(warm_frac[i])):
-			d, tree_idx = merra_kdtree.query([modis_lats[i], modis_lons[j]])
-			print(d, tree_idx)
-			break
+			modis_points.append(np.array([modis_lats[i], modis_lons[j]]))
+			test = np.array([np.array([modis_lats[i], modis_lons[j]])])
+			d, idx = merra_kdtree.query(test)
+			print(modis_lats[i], modis_lons[j])
+			print(X[idx[0]])
+			
 		break
+	break
 	
 	
