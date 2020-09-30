@@ -17,7 +17,9 @@ modis_daily = glob.glob(modis_dir.format(modis_day) + '*.hdf')
 modis_dict = {}
 for filename in modis_daily:
 	warm_frac, all_frac, lat_lon_dict = load_l2_MODIS.get_cloud_fraction(filename, average = True, local_grid = True, local_space = 2.5)
-	print(lat_lon_dict)
+	modis_lats = [(l1 + l2)/2 for l1, l2 in zip(lat_lon_dict['lats'][:-1], lat_lon_dict['lats'][1:])]
+	modis_lons = [(l1 + l2)/2 for l1, l2 in zip(lat_lon_dict['lons'][:-1], lat_lon_dict['lons'][1:])]
+	
 	hour = int(filename.split('/')[-1].split('.')[2][:2])
 	#minute = filename.split('/')[-1].split('.')[2][2:]
 	corr_merra_t = np.abs(merra_hours - hour).argmin()
@@ -28,5 +30,19 @@ for filename in modis_daily:
 	merra_filename = merra_dir + date.strftime('%d_%m_%Y.npy')
 	merra_data = np.load(merra_filename).item()
 	
+	print('creting tree')
+	X = []
+	for lat in merra_data['lats']:
+		for lon in merra_data['lons']:
+			X.append([lat, lon])
+	X = np.array(X)
+	print(X.shape)
+	merra_kdtree = KDTree(X)
+	for i in range(len(warm_frac)):
+		for j in range(len(warm_frac[i])):
+			d, tree_idx = merra_kdtree.query([modis_lats[i], modis_lons[j]])
+			print(d, tree_idx)
+			break
+		break
 	
 	
