@@ -89,15 +89,36 @@ def assign_lon_idx(c_l):
 def convert_to_byte(byte_value):
 	return str(format(abs(byte_value), '08b'))
 
+
+#TODO get the fielname for the cloud mask
+#get the 1 km res cloud mask
+#find the all cloud CF from this
+#use 1, 2 to find twilight CF from this
+def get_TW_mask(filename):
+	import glob
+	modis_mask_dir = '/neodc/modis/data/MYD35_L2/collection61/{}/{}/{}/'
+	parts = filename.split('/')
+	time = parts[-1].split('.')[2]
+	modis_mask_filename = glob.glob(modis_mask_dir.format(parts[6], parts[7], parts[8]) + '*.' + time + '.*.hdf')[0]
+	cloud_mask_data = SD(modis_mask_filename, SDC.READ)
+	for var in cloud_mask_data.datasets():
+		print(var)
+	cloud_mask = cloud_mask_data.select('Cloud_Mask').get()
+	test = cloud_mask[0][0][0]
+	print(convert_to_byte(int(test)))
+	return
+
 def get_L2_data(filename):
 	
-	#need the 1 km lats/lons
+	twilight_flag = get_TW_mask(filename)
+	sys.exit()
+	
+	#if need the 1 km lats/lons
 	#latitudes, longitudes = get_1deg_modis_lls(filename)
 
 	level_data = SD(filename, SDC.READ)
 	
 	lat_5km, lon_5km = level_data.select('Latitude').get(), level_data.select('Longitude').get()
-	
 	
 	re = level_data.select('Cloud_Effective_Radius').get()
 	lwp = level_data.select('Cloud_Water_Path').get()/1000.
@@ -132,7 +153,7 @@ def get_L2_data(filename):
 	cloud_fraction = N_cloudy_pixels/N_pixels
 	
 	
-	return re, lwp, cth, ctt, lat_5km, lon_5km, warm_cloud_flag, cloud_flag
+	return re, lwp, cth, ctt, lat_5km, lon_5km, warm_cloud_flag, cloud_flag, twilight_flag
 
 def get_cloud_fraction(filename, grid = None, average = False, local_grid = False, lat_s = .5, lon_s = .5):
 	global default_grid
@@ -142,8 +163,7 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 	
 	#get the warm cloud and cloudy pixels and lls
 	_, _, _, _, lats, lons, w_cs, cs = get_L2_data(filename)
-	plt.subplot(121)
-	plt.pcolormesh(lons, lats, cs)
+	
 	cs, w_cs, lats, lons = create_rectangle(lats, lons, cs, w_cs)
 	
 	if local_grid:
@@ -183,16 +203,12 @@ def get_cloud_fraction(filename, grid = None, average = False, local_grid = Fals
 				else:
 					wc_grid[i][j] = 0.
 					c_grid[i][j] = 0.
-	
-	
-	print(np.array(c_grid).shape)
-	print(len(longitudes), len(latitudes))
-	plt.subplot(122)
-	plt.pcolormesh(longitudes, latitudes, c_grid)
-	plt.show()
-	sys.exit()
-	
-	return np.array(wc_grid), np.array(c_grid), default_grid
+	c_grid = np.array(c_grid)
+	wc_grid = np.array(wc_grid)
+	c_grid = c_grid[:-1, :-1]
+	wc_grid = wc_grid[:-1, :-1]
+		
+	return wc_grid, c_grid, default_grid
 test_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/modis/modis_c61/myd06_l2/2007/213/'
 
 
