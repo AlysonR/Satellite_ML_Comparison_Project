@@ -5,44 +5,44 @@ import sys
 import matplotlib.pyplot as plt
 import copy
 from scipy import interpolate
-def create_rectangle(modis_lats, modis_lons, cloud_array, cloud_array2):
-	right_lon = modis_lons[0][-1] 
-	bottom_lat = modis_lats[-1][-1]
-	top_lat = modis_lats[0][0]
-	left_lon = modis_lons[-1][0]
+
+class MissingFileError(Exception):
+	"""Base class for missing a MODIS file"""
+	pass
+
+def trim_edges_bin(modis_lats, modis_lons, cloud_array, cloud_array2, cloud_array3, cloud_array4, cloud_array5):
 	
-	lon_lines = [right_lon, left_lon]
-	lat_lines = [bottom_lat, top_lat]
-	
-	left_lon = np.amin(lon_lines)
-	right_lon = np.amax(lon_lines)
-	
-	if np.amax(lon_lines) > 0:
-		right_lon = np.amax(lon_lines) * .98
-	else:
-		right_lon = np.amax(lon_lines) * 1.02
-	
-	bottom_lat = np.amin(lat_lines)
-	top_lat = np.amax(lat_lines)
-	
-	temp_1 = [[] for j in range(len(modis_lats))]
-	temp_2 = [[] for j in range(len(modis_lats))]
-	new_lats = [[] for j in range(len(modis_lats))]
-	new_lons = [[] for j in range(len(modis_lats))]
+	temp = [[[] for j in range(len(default_grid['lons']))] for i in range(len(default_grid['lats']))]
+	temp_2 = copy.deepcopy(temp)
+	temp_3 = copy.deepcopy(temp)
+	temp_4 = copy.deepcopy(temp)
+	temp_5 = copy.deepcopy(temp)
+	find_lats = np.vectorize(assign_lat_idx)
+	find_lons = np.vectorize(assign_lon_idx)
 	for i in range(len(modis_lats)):
-		for j in range(len(modis_lats[i])):
-			if (modis_lats[i][j] >= bottom_lat) and (modis_lats[i][j] <= top_lat) and \
-			(modis_lons[i][j] >= left_lon) and (modis_lons[i][j] <= right_lon):
-				temp_1[i].append(cloud_array[i][j])
-				temp_2[i].append(cloud_array2[i][j])
-				new_lats[i].append(modis_lats[i][j])
-				new_lons[i].append(modis_lons[i][j])
-	temp_1 = [a for a in temp_1 if len(a) > 0]
-	temp_2 = [a for a in temp_2 if len(a) > 0]
-	new_lats = [a for a in new_lats if len(a) > 0]
-	new_lons = [a for a in new_lons if len(a) > 0]
+		lat_indices = find_lats(modis_lats[i])
+		lon_indices = find_lons(modis_lons[i])
+		for j, (lai, loi) in enumerate(zip(lat_indices, lon_indices)):
+			temp[lai][loi].append(cloud_array[i][j])
+			temp_2[lai][loi].append(cloud_array2[i][j])
+			temp_3[lai][loi].append(cloud_array3[i][j])
+			temp_4[lai][loi].append(cloud_array4[i][j])
+			temp_5[lai][loi].append(cloud_array5[i][j])
 	
-	return temp_1, temp_2, new_lats, new_lons
+	for i in range(len(temp)):
+		temp[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp[i]]
+		temp_2[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_2[i]]
+		temp_3[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_3[i]]
+		temp_4[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_4[i]]
+		temp_5[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_5[i]]
+	
+	temp = np.array(temp)[:-1, :-1]
+	temp_2 = np.array(temp_2)[:-1, :-1]
+	temp_3 = np.array(temp_3)[:-1, :-1]
+	temp_4 = np.array(temp_4)[:-1, :-1]
+	temp_5 = np.array(temp_5)[:-1, :-1]
+	
+	return temp, temp_2, temp_3, temp_4, temp_5
 
 
 def interp(data, start_lat, start_lon, end_lat, end_lon):
@@ -90,34 +90,54 @@ def convert_to_byte(byte_value):
 	return str(format(abs(byte_value), '08b'))
 
 
+	
+
 #TODO get the fielname for the cloud mask
 #get the 1 km res cloud mask
 #find the all cloud CF from this
 #use 1, 2 to find twilight CF from this
-def get_TW_mask(filename):
+def get_1km_TW_mask(filename):
 	import glob
 	modis_mask_dir = '/neodc/modis/data/MYD35_L2/collection61/{}/{}/{}/'
 	parts = filename.split('/')
 	time = parts[-1].split('.')[2]
 	modis_mask_filename = glob.glob(modis_mask_dir.format(parts[6], parts[7], parts[8]) + '*.' + time + '.*.hdf')[0]
 	cloud_mask_data = SD(modis_mask_filename, SDC.READ)
-	for var in cloud_mask_data.datasets():
-		print(var)
+	latitudes = cloud_mask_data.select('Latitude').get()
+	longitudes = cloud_mask_data.select('Longitude').get()
 	cloud_mask = cloud_mask_data.select('Cloud_Mask').get()
-	test = cloud_mask[0][0][0]
-	print(convert_to_byte(int(test)))
+	byte_all = np.vectorize(convert_to_byte)
+	cloud_mask_converted = byte_all(cloud_mask)
+	#00110001
+	c_shape = cloud_mask_converted.shape
+	cloudy = [[0 for i in range(c_shape[1])] for j in range(c_shape[2])]
+	for row in range(len(cloud_mask_converted)):
+		for aisle in range(len(cloud_mask_converted[row])):
+			for byte in cloud_mask_converted[row][aisle]:
+				if str(byte)[1:3] == '01':
+					cloudy[row][aisle] = 1.
+				else:
+					cloudy[row][aisle]= 0.
+	cloudy = np.array(cloudy)
 	return
 
 def get_L2_data(filename):
-	
-	twilight_flag = get_TW_mask(filename)
-	sys.exit()
+	#optinoal to get twilight flag from 1km cloud mask data
+	#twilight_flag = get_1km_TW_mask(filename)
 	
 	#if need the 1 km lats/lons
 	#latitudes, longitudes = get_1deg_modis_lls(filename)
 
 	level_data = SD(filename, SDC.READ)
 	
+	twilight_flag = level_data.select('Cloud_Mask_5km').get().tolist()
+	for i in range(len(twilight_flag)):
+		for j in range(len(twilight_flag[i])):
+			byte = str(convert_to_byte(twilight_flag[i][j][0]))
+			if byte[1:3] == '01' or byte[1:3] == '00':
+				twilight_flag[i][j] = 1.
+			else:	
+				twilight_flag[i][j] = 0.			
 	lat_5km, lon_5km = level_data.select('Latitude').get(), level_data.select('Longitude').get()
 	
 	re = level_data.select('Cloud_Effective_Radius').get()
@@ -155,60 +175,32 @@ def get_L2_data(filename):
 	
 	return re, lwp, cth, ctt, lat_5km, lon_5km, warm_cloud_flag, cloud_flag, twilight_flag
 
-def get_cloud_fraction(filename, grid = None, average = False, local_grid = False, lat_s = .5, lon_s = .5):
+def get_cloud_fraction(filename, lat_s = .5, lon_s = .5):
 	global default_grid
-	#first set the grid
-	if grid:
-		default_grid = grid
 	
 	#get the warm cloud and cloudy pixels and lls
-	_, _, _, _, lats, lons, w_cs, cs = get_L2_data(filename)
+	re, _, cth, _, lats, lons, w_cs, cs, ts = get_L2_data(filename)
 	
-	cs, w_cs, lats, lons = create_rectangle(lats, lons, cs, w_cs)
+	#first set the grid
 	
-	if local_grid:
+	latitudes = np.arange(np.amin(np.amin(lats)), np.amax(np.amax(lats))+lat_s, lat_s)
+	longitudes = np.arange(np.amin(np.amin(lons)), np.amax(np.amax(lons))+lat_s, lon_s)
+	default_grid = {'lats': latitudes, 'lons': longitudes}
 	
-		latitudes = np.arange(np.amin(np.amin(lats)), np.amax(np.amax(lats)), lat_s)
-		longitudes = np.arange(np.amin(np.amin(lons)), np.amax(np.amax(lons)), lon_s)
-		default_grid = {'lats': latitudes, 'lons': longitudes}
+	c_grid, wc_grid, t_grid, re_grid, cth_grid  = trim_edges_bin(lats, lons, cs, w_cs, ts, re, cth)
 	
-	#place lls in grid
-	find_lats = np.vectorize(assign_lat_idx)
-	find_lons = np.vectorize(assign_lon_idx)
+	nan_wc_grid = np.isnan(wc_grid)
+	wc_grid[nan_wc_grid] = 0.
+	nan_c_grid = np.isnan(c_grid)
+	c_grid[nan_c_grid] = 0.
+	nan_t_grid = np.isnan(t_grid)
+	t_grid[nan_t_grid] = 0.
+	nan_re_grid = np.isnan(re_grid)
+	re_grid[nan_re_grid] = 0.
+	nan_cth_grid = np.isnan(cth_grid)
+	cth_grid[nan_cth_grid] = 0.
 	
-	#create grids based on given info
-	#the last row should be thrown out
-	wc_grid = [ [ [] for i in range(len(default_grid['lons']))] for j in range(len(default_grid['lats']))]
-	c_grid = copy.deepcopy(wc_grid)
-	
-	#assign flag values to grid cells to find each grid cell's CF
-	for i in range(len(lats)):
-		for j in range(len(lats[i])):
-			lat_index = find_lats(lats[i][j])
-			lon_index = find_lons(lons[i][j])
-			
-			try:
-				wc_grid[lat_index][lon_index].append(w_cs[i][j])
-				c_grid[lat_index][lon_index].append(cs[i][j])
-			except IndexError:
-				print('here at index error')
-				sys.exit()
-	
-	if average:
-		for i in range(len(wc_grid)):
-			for j in range(len(wc_grid[0])):
-				if len(wc_grid[i][j]) > 0:
-					wc_grid[i][j] = np.nanmean(wc_grid[i][j])
-					c_grid[i][j] = np.nanmean(c_grid[i][j])
-				else:
-					wc_grid[i][j] = 0.
-					c_grid[i][j] = 0.
-	c_grid = np.array(c_grid)
-	wc_grid = np.array(wc_grid)
-	c_grid = c_grid[:-1, :-1]
-	wc_grid = wc_grid[:-1, :-1]
-		
-	return wc_grid, c_grid, default_grid
+	return wc_grid, c_grid, t_grid, re_grid, cth_grid, default_grid
 test_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/modis/modis_c61/myd06_l2/2007/213/'
 
 

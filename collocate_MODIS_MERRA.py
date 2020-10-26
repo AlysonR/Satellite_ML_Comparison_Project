@@ -38,7 +38,7 @@ for hour in range(5):
 for filename in modis_daily[20:]:
 	print(filename)
 	try:
-		warm_frac, all_frac, twi_frac, lat_lon_dict = load_l2_MODIS.get_cloud_fraction(filename, lat_s = .875, lon_s = .875)
+		warm_frac, all_frac, twi_frac, re_mean, cth_mean, lat_lon_dict = load_l2_MODIS.get_cloud_fraction(filename, lat_s = .875, lon_s = .875)
 		modis_lats = [(l1 + l2)/2 for l1, l2 in zip(lat_lon_dict['lats'][:-1], lat_lon_dict['lats'][1:])]
 		modis_lons = [(l1 + l2)/2 for l1, l2 in zip(lat_lon_dict['lons'][:-1], lat_lon_dict['lons'][1:])]
 		
@@ -49,6 +49,8 @@ for filename in modis_daily[20:]:
 		temp_d['all_frac'] = all_frac
 		temp_d['twi_frac'] = twi_frac
 		temp_d['filename'] = filename
+		temp_d['re'] = re_mean
+		temp_d['cth'] = cth_mean
 		
 		hour = int(filename.split('/')[-1].split('.')[2][:2])
 		corr_merra_t = np.abs(merra_hours - hour).argmin()
@@ -61,6 +63,7 @@ for corr_merra_t in modis_dict.keys():
 	print(merra_hours[corr_merra_t], 'merra time')
 	merra_filename = merra_dir + '{}_{}_{}.npy'.format(modis_day, modis_month, modis_year)
 	merra_data = np.load(merra_filename).item()
+	print(merra_data.keys())
 	print('creating merra tree')
 	X = []
 	merra_idxs = []
@@ -87,6 +90,8 @@ for corr_merra_t in modis_dict.keys():
 		vars_dict['warm_frac'] = warm_frac
 		vars_dict['all_frac'] = modis_reading['all_frac']
 		vars_dict['twi_frac'] = modis_reading['twi_frac']
+		vars_dict['re'] = modis_reading['re']
+		vars_dict['cth'] = modis_reading['cth']
 		
 		for i in range(len(warm_frac)):
 			for j in range(len(warm_frac[i])):
