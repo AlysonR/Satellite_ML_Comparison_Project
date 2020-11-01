@@ -45,7 +45,8 @@ for cloudsat_granule in cloudsat_files:
 	start_time = datetime.datetime(year = int(granule_time[:4]), month = 1, day = 1, hour = int(granule_time[7:9]), minute = int(granule_time[9:11]))
 	start_time += datetime.timedelta(days = int(granule_time[4:7]))
 	time = [start_time + datetime.timedelta(seconds = int(a)) for a in time]
-	
+	end_time = start_time.replace(minute = (start_time.minute - start_time.minute%5) + 5)
+	print(end_time)
 	five_min_intervals = [start_time.replace(minute = start_time.minute - start_time.minute%5) + datetime.timedelta(minutes = x) for x in range(0, 24*60, 5)]
 	#find where cloudsat times ~ 5 minute interval +- 2 seconds
 	
