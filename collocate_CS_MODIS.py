@@ -45,9 +45,10 @@ for cloudsat_granule in cloudsat_files:
 	start_time = datetime.datetime(year = int(granule_time[:4]), month = 1, day = 1, hour = int(granule_time[7:9]), minute = int(granule_time[9:11]))
 	start_time += datetime.timedelta(days = int(granule_time[4:7]))
 	time = [start_time + datetime.timedelta(seconds = int(a)) for a in time]
-	end_time = start_time.replace(minute = (start_time.minute - start_time.minute%5) + 5)
-	print(end_time)
-	five_min_intervals = [start_time.replace(minute = start_time.minute - start_time.minute%5) + datetime.timedelta(minutes = x) for x in range(0, 24*60, 5)]
+	start_chunk = start_time.replace(minute = start_time.minute - start_time.minute%5, second = 0)
+	end_chunk = time[-1].replace(minute = (start_time.minute - start_time.minute%5) + 5, second = 0)
+	num_chunks = int((end_chunk - start_chunk).seconds/300)
+	five_min_intervals = [start_chunk + datetime.timedelta(minutes = 5 * i) for i in range(num_chunks +1)]
 	#find where cloudsat times ~ 5 minute interval +- 2 seconds
 	
 	cs_lats = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Latitude')]
