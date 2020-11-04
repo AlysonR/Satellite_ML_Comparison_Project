@@ -20,13 +20,12 @@ year = 2008
 
 #note, americans would prefer month day year but for the global good i did day month year
 print('getting MODIS grids for ', day, month, year)
-modis_dir = '/neodc/modis/data/MYD35_L2/collection61/{}/{}/{}/'
-modis_files = sorted(glob.glob(modis_dir.format(year, month, day) + '*.hdf'))
+modis_dir = '/neodc/modis/data/MYD03/collection61/{}/{}/{}/'
 
 diy = datetime.date(year = year, month = int(month), day = int(day)) - datetime.date(year = year, month = 1, day = 1)
-diy = diy.days
+diy = diy.days +1
 day_before = datetime.date(year = year, month = int(month), day = int(day)) - datetime.timedelta(days = 1)
-day_before = (day_before - datetime.date(year = year, month = 1, day = 1)).days
+day_before = (day_before - datetime.date(year = year, month = 1, day = 1)).days + 1
 
 cloudsat_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/cloudsat/2b-geoprof/R05/{}/{}/'
 cloudsat_daybefore = sorted(glob.glob(cloudsat_dir.format(year, day_before) + '*.hdf'))[-1]
@@ -49,31 +48,47 @@ for cloudsat_granule in cloudsat_files:
 	
 	start_chunk = start_time.replace(minute = start_time.minute - start_time.minute%5, second = 0)
 	end_chunk = time[-1].replace(minute = time[-1].minute//5 * 5, second = 0)
+	
 	num_chunks = int((end_chunk - start_chunk).seconds//300)
 	
-	five_min_intervals = [start_chunk + datetime.timedelta(minutes = 5 * i) for i in range(num_chunks)]
+	five_min_intervals = [start_chunk + datetime.timedelta(minutes = 5 * i) for i in range(num_chunks + 1)]
 	#find where cloudsat times ~ 5 minute interval +- 2 seconds
 	fmi_indices = [None for a in range(len(five_min_intervals))]
 	for n, fmi_t in enumerate(five_min_intervals):
 		chunk_index = np.abs(time - fmi_t).argmin()
-		if (chunk_index == len(time)) or (chunk_index == 0):
-			fmi_indices[n] = chunk_index 
-		else:
-			fmi_indices[n] = chunk_index - 4
+		fmi_indices[n] = chunk_index 
+		
 	fmi_indices.append(len(time))
 	five_min_intervals.append(end_chunk)
+	
 	for n, (start_chunk, end_chunk) in enumerate(zip(fmi_indices[:-1], fmi_indices[1:])):
 		HH = five_min_intervals[n].strftime('%H')
 		MM = five_min_intervals[n].strftime('%M')
+		print(time[start_chunk], HH, MM)
 		call_statement = modis_dir.format(year, month, day) + '*.{}{}.*.hdf'.format(HH, MM)
 		
 		corr_modis_filename = glob.glob(call_statement)
+		print(corr_modis_filename)
 		if len(corr_modis_filename) > 0:
 			modis_locs_data = SD(corr_modis_filename[0], SDC.READ)
 			modis_latitudes = modis_locs_data.select('Latitude').get()
 			modis_longitudes = modis_locs_data.select('Longitude').get()
-			print(modis_latitudes)
-		sys.exit()
+			
+			X_row_col = []
+			X = []
+			for i in range(len(modis_latitudes)):
+				for j in range(len(modis_latitudes[i])):
+					X.append((modis_latitudes[i][j], modis_longitudes[i][j]))
+					X_row_col.append((i, j))
+			
+			X = np.array(X)
+			print('Building MODIS Tree')
+			modis_KDTree = KDTree(X)
+			for clat, clon in zip(cs_lats[start_chunk:end_chunk], cs_lons[start_chunk:end_chunk]):
+				d, idx = modis_KDTree.query([(clat, clon)])
+				print(d, idx)
+			
+	sys.exit()
 	
 	
 	
