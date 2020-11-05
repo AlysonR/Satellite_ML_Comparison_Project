@@ -11,9 +11,18 @@ from sklearn.neighbors import KDTree
 import matplotlib.pyplot as plt
 import cloudsat_tools
 
-
-#note this does not take care of the problem of needing leading zeroes on cloudsat diys
+def find_scl(temp_list):
+	'''
+	Parameters:
+		temp_list: (list) a temperature list for the cloudsat granule that goes down in height from 0
+	Returns:
+		scl_i: (int) the height at which any liquid in the cloud would be below freez, or the Super Cooled Level Index
+	'''
 	
+	scl_i = np.abs(temp_list - 263.15).argmin()
+	return scl_i
+
+#note this does not take care of the problem of needing leading zeroes on cloudsat diys	
 day = '21'
 month = '05'
 year = 2008
@@ -30,14 +39,35 @@ day_before = (day_before - datetime.date(year = year, month = 1, day = 1)).days 
 cloudsat_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/cloudsat/2b-geoprof/R05/{}/{}/'
 cloudsat_daybefore = sorted(glob.glob(cloudsat_dir.format(year, day_before) + '*.hdf'))[-1]
 cloudsat_files = sorted(glob.glob(cloudsat_dir.format(year, diy) + '*.hdf'))
+cloudsat_ro_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/cloudsat/2b-cwc-ro/R05/{}/{}/'.format(year, diy)
+cloud_type_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/cloudsat/2b-cldclass-lidar/R05/{}/{}/'.format(year, diy)
+ecmwf_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/cloudsat/ecmwf-aux/R05/{}/{}/'.format(year, diy)
 #note: cloudsat filenames go year, day, HH MM SS at the start
 
 #chunk cloudsat by 5 minutes
 cloudsat_chunks = {}
 for cloudsat_granule in cloudsat_files:
 	cloudsat_data = HDF(cloudsat_granule, HC.READ)
+	granule_number = cloudsat_granule.split('/')[-1].split('_')[1]
+	
+	#super cooled data
+	ro_filename = glob.glob(cloudsat_ro_dir + '*_{}_*.hdf'.format(granule_number))[0]
+	ro_data = HDF(ro_filename, HC.READ)
+	iwp = cloudsat_tools.get_1D_var(ro_data, 'RO_ice_water_path')
+	lwp = cloudsat_tools.get_1D_var(ro_data, 'RO_liq_water_path')
+	tot_wp = iwp + lwp
+	
+	ecmwf_filename = glob.glob(ecmwf_dir + '*_{}_*.hdf'.format(granule_number))[0]
+	ecmwf_data = SD(ecmwf_filename, SDC.READ)
+	temperature = ecmwf_data.select('Temperature').get()
+	test = find_scl(temperature[10])
+	ecmwf_hdf_data = HDF(ecmwf_filename, HC.READ)
+	ec_heights = [a[0] for a in cloudsat_tools.get_1D_var(ecmwf_hdf_data, 'EC_height')]
+	sys.exit()
+	
 	cs_lats = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Latitude')]
 	cs_lons = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Longitude')]
+	c_indices = list(range(len(cs_lats)))
 	
 	profile_time = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Profile_time')]
 	granule_time = cloudsat_granule.split('/')[-1].split('_')[0]
@@ -67,15 +97,17 @@ for cloudsat_granule in cloudsat_files:
 		print(time[start_chunk], HH, MM)
 		call_statement = modis_dir.format(year, month, day) + '*.{}{}.*.hdf'.format(HH, MM)
 		
-		corr_modis_filename = glob.glob(call_statement)
+		corr_modis_filename = glob.glob(call_statement)[0]
 		print(corr_modis_filename)
 		if len(corr_modis_filename) > 0:
-			modis_locs_data = SD(corr_modis_filename[0], SDC.READ)
+			modis_locs_data = SD(corr_modis_filename, SDC.READ)
 			modis_latitudes = modis_locs_data.select('Latitude').get()
 			modis_longitudes = modis_locs_data.select('Longitude').get()
+			blank_MODIS = [[0 for i in range(len(modis_latitudes[0]))] for j in range(len(modis_latitudes))]
 			
 			X_row_col = []
 			X = []
+			
 			for i in range(len(modis_latitudes)):
 				for j in range(len(modis_latitudes[i])):
 					X.append((modis_latitudes[i][j], modis_longitudes[i][j]))
@@ -84,11 +116,20 @@ for cloudsat_granule in cloudsat_files:
 			X = np.array(X)
 			print('Building MODIS Tree')
 			modis_KDTree = KDTree(X)
-			for clat, clon in zip(cs_lats[start_chunk:end_chunk], cs_lons[start_chunk:end_chunk]):
+			for c_i, clat, clon in zip(c_indices[start_chunk:end_chunk], cs_lats[start_chunk:end_chunk], cs_lons[start_chunk:end_chunk]):
 				d, idx = modis_KDTree.query([(clat, clon)])
-				print(d, idx)
-			
-	sys.exit()
+				
+				mll = X_row_col[idx[0][0]]
+				modis_lat = modis_latitudes[mll[0]][mll[1]]
+				modis_lon = modis_longitudes[mll[0]][mll[1]]
+				#print(modis_lat, modis_lon, clat, clon)
+				#print(c_i)
+				
+				blank_MODIS[mll[0]][mll[1]] = 1.
+				
+			plt.pcolormesh(modis_latitudes, modis_longitudes, blank_MODIS, cmap = 'inferno')
+			plt.show()
+			sys.exit()
 	
 	
 	
