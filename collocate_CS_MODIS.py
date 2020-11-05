@@ -11,24 +11,39 @@ from sklearn.neighbors import KDTree
 import matplotlib.pyplot as plt
 import cloudsat_tools
 
-def find_scl(temp_list):
+
+def find_closest_h(h_list, point):
 	'''
 	Parameters:
-		temp_list: (list) a temperature list for the cloudsat granule that goes down in height from 0
+		point: (int/float) the point (a height) that you are trying to find the other closest point in the list to
+		h_list: (list) the list that you are trying to find the closest items to the point to
 	Returns:
-		scl_i: (int) the height at which any liquid in the cloud would be below freez, or the Super Cooled Level Index
+		h_i: (int) the index of the closest item in the list to the point
 	'''
+	h_i = np.abs(h_list - point).argmin()
+	return h_i
+def get_sc(list_of_temps, ecmwf_heights, cloudsat_heights, liq_wc):
+	sc_ls = []
+	for i in range(len(list_of_temps)):
+		ec_h = ecmwf_heights[find_closest_h(list_of_temps[i], 263.15)]
+		cs_i = find_closest_h(cloudsat_heights[i], ec_h) + 1
+		sc_liq = liq_wc[i][:cs_i]
+		temp = cloudsat_heights[i][:cs_i]
+		lwp = 0
+		for wc, ztop, zbot in zip(sc_liq, temp[:-1], temp[1:]):
+			dz = ztop - zbot
+			if wc > 0:
+				lwp += dz * wc
+		sc_ls.append(lwp)
 	
-	scl_i = np.abs(temp_list - 263.15).argmin()
-	return scl_i
-
+	return sc_ls	
+	
 #note this does not take care of the problem of needing leading zeroes on cloudsat diys	
 day = '21'
 month = '05'
 year = 2008
 
 #note, americans would prefer month day year but for the global good i did day month year
-print('getting MODIS grids for ', day, month, year)
 modis_dir = '/neodc/modis/data/MYD03/collection61/{}/{}/{}/'
 
 diy = datetime.date(year = year, month = int(month), day = int(day)) - datetime.date(year = year, month = 1, day = 1)
@@ -52,18 +67,23 @@ for cloudsat_granule in cloudsat_files:
 	
 	#super cooled data
 	ro_filename = glob.glob(cloudsat_ro_dir + '*_{}_*.hdf'.format(granule_number))[0]
-	ro_data = HDF(ro_filename, HC.READ)
-	iwp = cloudsat_tools.get_1D_var(ro_data, 'RO_ice_water_path')
-	lwp = cloudsat_tools.get_1D_var(ro_data, 'RO_liq_water_path')
-	tot_wp = iwp + lwp
+	ro_data = SD(ro_filename, SDC.READ)
+	lwc = ro_data.select('RO_liq_water_content').get()
+	heights = ro_data.select('Height').get()
+	ro_hdf_data = HDF(ro_filename, HC.READ)
+	lwp = np.array([a[0] for a in cloudsat_tools.get_1D_var(ro_hdf_data, 'RO_liq_water_path')])
+	iwp = np.array([a[0] for a in cloudsat_tools.get_1D_var(ro_hdf_data, 'RO_ice_water_path')])
+	tot_path = lwp + iwp
 	
 	ecmwf_filename = glob.glob(ecmwf_dir + '*_{}_*.hdf'.format(granule_number))[0]
 	ecmwf_data = SD(ecmwf_filename, SDC.READ)
 	temperature = ecmwf_data.select('Temperature').get()
-	test = find_scl(temperature[10])
+	
 	ecmwf_hdf_data = HDF(ecmwf_filename, HC.READ)
 	ec_heights = [a[0] for a in cloudsat_tools.get_1D_var(ecmwf_hdf_data, 'EC_height')]
-	sys.exit()
+	sc_levels = np.array(get_sc(temperature, ec_heights, heights, lwc))/1000.
+	#using the supercooled liquid water path from sc_levels, divid by total water path to get supercoold liq frac
+	slf = sc_levels / tot_path
 	
 	cs_lats = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Latitude')]
 	cs_lons = [a[0] for a in cloudsat_tools.get_1D_var(cloudsat_data, 'Longitude')]
@@ -116,20 +136,21 @@ for cloudsat_granule in cloudsat_files:
 			X = np.array(X)
 			print('Building MODIS Tree')
 			modis_KDTree = KDTree(X)
+			ds = []
 			for c_i, clat, clon in zip(c_indices[start_chunk:end_chunk], cs_lats[start_chunk:end_chunk], cs_lons[start_chunk:end_chunk]):
 				d, idx = modis_KDTree.query([(clat, clon)])
-				
+				ds.append(d[0])
 				mll = X_row_col[idx[0][0]]
 				modis_lat = modis_latitudes[mll[0]][mll[1]]
 				modis_lon = modis_longitudes[mll[0]][mll[1]]
 				#print(modis_lat, modis_lon, clat, clon)
 				#print(c_i)
 				
-				blank_MODIS[mll[0]][mll[1]] = 1.
+				blank_MODIS[mll[0]][mll[1]] = 1.0
 				
-			plt.pcolormesh(modis_latitudes, modis_longitudes, blank_MODIS, cmap = 'inferno')
-			plt.show()
-			sys.exit()
+			plt.plot(ds)
+	plt.show()
+	sys.exit()
 	
 	
 	
