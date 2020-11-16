@@ -10,12 +10,14 @@ class MissingFileError(Exception):
 	"""Base class for missing a MODIS file"""
 	pass
 
-def trim_edges_bin(modis_lats, modis_lons, cloud_array, cloud_array2, cloud_array3, cloud_array4):
+def trim_edges_bin(modis_lats, modis_lons, cloud_array, cloud_array2, cloud_array3, cloud_array4, cloud_array5):
+	global default_grid
 	
 	temp = [[[] for j in range(len(default_grid['lons']))] for i in range(len(default_grid['lats']))]
 	temp_2 = copy.deepcopy(temp)
 	temp_3 = copy.deepcopy(temp)
 	temp_4 = copy.deepcopy(temp)
+	temp_5 = copy.deepcopy(temp)
 	
 	find_lats = np.vectorize(assign_lat_idx)
 	find_lons = np.vectorize(assign_lon_idx)
@@ -27,22 +29,24 @@ def trim_edges_bin(modis_lats, modis_lons, cloud_array, cloud_array2, cloud_arra
 			temp_2[lai][loi].append(cloud_array2[i][j])
 			temp_3[lai][loi].append(cloud_array3[i][j])
 			temp_4[lai][loi].append(cloud_array4[i][j])
+			temp_5[lai][loi].append(cloud_array5[i][j])
 			
 	
 	for i in range(len(temp)):
+		
 		temp[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp[i]]
 		temp_2[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_2[i]]
 		temp_3[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_3[i]]
 		temp_4[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_4[i]]
-		
+		temp_5[i] = [np.nanmean(a) if len(a) > 0 else np.nan for a in temp_5[i]]
 	
 	temp = np.array(temp)[:-1, :-1]
 	temp_2 = np.array(temp_2)[:-1, :-1]
 	temp_3 = np.array(temp_3)[:-1, :-1]
 	temp_4 = np.array(temp_4)[:-1, :-1]
+	temp_5 = np.array(temp_5)[:-1, :-1]
 	
-	
-	return temp, temp_2, temp_3, temp_4
+	return temp, temp_2, temp_3, temp_4, temp_5
 
 
 def interp(data, start_lat, start_lon, end_lat, end_lon):
@@ -118,19 +122,20 @@ def get_1km_TW_mask(filename):
 def get_L2_data(filename):
 	#optinoal to get twilight flag from 1km cloud mask data
 	#twilight_flag = get_1km_TW_mask(filename)
-	
-	lat_1km, lon_1km = get_1deg_modis_lls(filename)
-	
+	try:
+		lat_1km, lon_1km = get_1deg_modis_lls(filename)
+	except IndexError:
+		raise MissingFileError
 	level_data = SD(filename, SDC.READ)
 	
-	twilight_flag = level_data.select('Cloud_Mask_5km').get().tolist()
+	'''twilight_flag = level_data.select('Cloud_Mask_5km').get().tolist()
 	for i in range(len(twilight_flag)):
 		for j in range(len(twilight_flag[i])):
 			byte = str(convert_to_byte(twilight_flag[i][j][0]))
 			if byte[1:3] == '01' or byte[1:3] == '00':
 				twilight_flag[i][j] = 1.
 			else:	
-				twilight_flag[i][j] = 0.			
+				twilight_flag[i][j] = 0.	'''		
 	lat_5km, lon_5km = level_data.select('Latitude').get(), level_data.select('Longitude').get()
 	
 	re = level_data.select('Cloud_Effective_Radius').get().astype('float')
@@ -138,31 +143,29 @@ def get_L2_data(filename):
 	re[bad_re] = np.nan
 	re = re - level_data.select('Cloud_Effective_Radius').attributes()['add_offset']
 	re = re * level_data.select('Cloud_Effective_Radius').attributes()['scale_factor']
-	print(lon_1km.shape, lat_1km.shape)
-	plt.subplot(141)
-	plt.pcolormesh(lon_1km, lat_1km, re)
-	plt.colorbar()
 	
-	print(re.shape, 're')
 	lwp = level_data.select('Cloud_Water_Path').get()/1000.
-	print(lwp.shape, 'lwp')
 	cth = level_data.select('Cloud_Top_Height').get()/1000.
-	print(cth.shape, 'cth')
-	
-	plt.subplot(142)
-	plt.pcolormesh(lon_5km, lat_5km, cth)
 	
 	ctt = level_data.select('Cloud_Top_Temperature').get() - level_data.select('Cloud_Top_Temperature').attributes()['add_offset'] 
 	ctt = ctt * level_data.select('Cloud_Top_Temperature').attributes()['scale_factor']
 	
 	#ctt = interp(ctt, lat_5km, lon_5km, latitudes, longitudes)
 	
-	cold = (ctt < 253)
-	warm = (ctt > 253)
+	sc = ((ctt <= 263) & (ctt >= 243) & (cth <= 6))
+	
+	cold = (ctt < 270)
+	warm = (ctt > 270)
 	
 	clear = (cth <= 0)
 	nan = np.isnan(cth)
 	cloudy = (cth > 0)
+	
+	sc_flag = copy.deepcopy(ctt)
+	sc_flag[warm] = 0.
+	sc_flag[cold] = 0.
+	sc_flag[sc] = 1.
+	sc_flag[clear] = 0.
 	
 	warm_cloud_flag = copy.deepcopy(ctt)
 	warm_cloud_flag[cold] = 0.
@@ -182,41 +185,56 @@ def get_L2_data(filename):
 	warm_cloud_fraction = N_wc_pixels/N_pixels
 	cloud_fraction = N_cloudy_pixels/N_pixels
 	
+	return re, lwp, cth, ctt, lat_5km, lon_5km, warm_cloud_flag, cloud_flag, lat_1km, lon_1km, sc_flag
+
+def filter_bad(radius, liq, heights, tops, lat_5km, lon_5km, wf, cf, lat_1km, lon_1km, sf):
 	
-	return re, lwp, cth, ctt, lat_5km, lon_5km, warm_cloud_flag, cloud_flag, twilight_flag, lat_1km, lon_1km
+	bad = ((radius == -999.) | (liq == -999) | (lat_1km == -999.) | (lon_1km == -999.))
+	radius[bad] = np.nan
+	liq[bad] = np.nan
+	lat_1km[bad] = np.nan
+	lon_1km[bad] = np.nan
+	
+	bad_smal = ((heights == -999.) | (tops == -999.) | (lon_5km == -999.) | (lat_5km == -999))
+	heights[bad_smal] = np.nan
+	tops[bad_smal] = np.nan
+	lat_5km[bad_smal] = np.nan
+	lon_5km[bad_smal] = np.nan
+	wf[bad_smal] = np.nan
+	cf[bad_smal] = np.nan
+	sf[bad_smal] = np.nan
+	return radius, liq, heights, tops, lat_5km, lon_5km, wf, cf, lat_1km, lon_1km, sf
 
 def get_cloud_fraction(filename, lat_s = .5, lon_s = .5):
 	global default_grid
 	
 	#get the warm cloud and cloudy pixels and lls
-	re, lwp, cth, _, lats, lons, w_cs, cs, ts, lats_1km, lons_1km = get_L2_data(filename)
-	
+	re, lwp, cth, ctt, lats, lons, w_cs, cs, lats_1km, lons_1km, sc_cs = get_L2_data(filename)
+	re, lwp, cth, ctt, lats, lons, w_cs, cs, lats_1km, lons_1km, sc_cs  = filter_bad(re, lwp, cth, ctt, lats, lons, w_cs, cs, lats_1km, lons_1km, sc_cs )
 	#first set the grid
-	
-	latitudes = np.arange(np.amin(np.amin(lats)), np.amax(np.amax(lats))+lat_s, lat_s)
-	longitudes = np.arange(np.amin(np.amin(lons)), np.amax(np.amax(lons))+lat_s, lon_s)
+	lats += 90.
+	lons += 180.
+	lats_1km += 90.
+	lons_1km += 180.
+	latitudes = np.arange(np.nanmin(lats), np.nanmax(lats)+lat_s, lat_s)
+	longitudes = np.arange(np.nanmin(lons), np.nanmax(lons)+lon_s, lon_s)
 	default_grid = {'lats': latitudes, 'lons': longitudes}
+	c_grid, wc_grid, cth_grid, sat_grid, sc_grid  = trim_edges_bin(lats, lons, cs, w_cs, cth, lats, sc_cs)
 	
-	c_grid, wc_grid, t_grid, cth_grid  = trim_edges_bin(lats, lons, cs, w_cs, ts, cth)
-	
-	re_grid, lwp_grid, _, _ = trim_edges_bin(lats_1km, lons_1km, re, lwp, re, lwp)
-	plt.subplot(143)
-	plt.pcolormesh(default_grid['lons'], default_grid['lats'], re_grid)
-	plt.subplot(144)
-	plt.pcolormesh(default_grid['lons'], default_grid['lats'], c_grid, vmin = 0, vmax = 1, cmap = 'viridis')
-	plt.show()
-	nan_wc_grid = np.isnan(wc_grid)
+	re_grid, lwp_grid, _, _, _ = trim_edges_bin(lats_1km, lons_1km, re, lwp, re, lwp, re)
+
+	'''nan_wc_grid = np.isnan(wc_grid)
 	wc_grid[nan_wc_grid] = 0.
 	nan_c_grid = np.isnan(c_grid)
 	c_grid[nan_c_grid] = 0.
-	nan_t_grid = np.isnan(t_grid)
-	t_grid[nan_t_grid] = 0.
 	nan_re_grid = np.isnan(re_grid)
 	re_grid[nan_re_grid] = 0.
 	nan_cth_grid = np.isnan(cth_grid)
 	cth_grid[nan_cth_grid] = 0.
-	
-	return wc_grid, c_grid, t_grid, re_grid, cth_grid, default_grid
+	nan_sc_grid = np.isnan(sc_grid)
+	sc_grid[nan_sc_grid] = 0.'''
+
+	return wc_grid, c_grid, re_grid, cth_grid, sc_grid, sat_grid, default_grid
 test_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/modis/modis_c61/myd06_l2/2007/213/'
 
 

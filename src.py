@@ -13,7 +13,7 @@ def assign_bin(point):
 	else:
 		return None
 
-def get_X_y(tiles_dir, y_var = 'all_frac', warm_only = False, X_vars = ['EIS', 'LTS', 'w500', 'u500', 'v500', 'u850', 'v850', 'u700', 'v700', 'RH900', 'RH850', 'RH700', 'evap', 'sst'], y_min = -998.):
+def get_X_y(tiles_dir, y_var = 'all_frac', warm_only = False, cloud_only = False, X_vars = ['EIS', 'LTS', 'w500', 'u500', 'v500', 'u850', 'v850', 'u700', 'v700', 'RH900', 'RH850', 'RH700', 'evap', 'sst'], y_min = -1.):
 	import glob
 	
 	files_used = []
@@ -23,7 +23,10 @@ def get_X_y(tiles_dir, y_var = 'all_frac', warm_only = False, X_vars = ['EIS', '
 		temp = np.load(filename, allow_pickle = True).item()
 		if warm_only:
 			cool = (temp['warm_frac'] == 0)
-			temp[y_var][cool] = np.nan
+			temp['sst'][cool] = np.nan
+		if cloud_only:
+			clear = (temp['all_fracc'] == 0)
+			temp['sst'][clear] = np.nan
 		
 		for row in range(len(temp['sst'])):
 			for tile in range(len(temp['sst'][row])):
@@ -31,7 +34,7 @@ def get_X_y(tiles_dir, y_var = 'all_frac', warm_only = False, X_vars = ['EIS', '
 				for var in X_vars:
 					xai.append(temp[var][row][tile])
 				#start with only cloud
-				if (True not in np.isnan(xai)) and (temp[y_var][row][tile] > y_min):
+				if ((True not in np.isnan(xai)) and (temp[y_var][row][tile] > y_min)):
 					X.append(xai)
 					y.append(temp[y_var][row][tile])
 					if filename not in files_used:
@@ -69,39 +72,38 @@ def bin_2d_mean(param1, param2, mean_p):
 	print(bins)
 	return bins, limits_y, limits_x
 	
-def create_swath(filename, predictor, y_var, x_vars, cnc = False):
+def create_swath(filename, predictor, y_var, x_vars, cnc = False, y_min = -1):
 	from skimage.metrics import structural_similarity as ssim
 	import matplotlib.pyplot as plt
-
+	import copy
+	print('creating swath of', filename)
 	temp = np.load(filename, allow_pickle = True).item()
+	below_ymin =  (np.isnan(temp[y_var]) | (temp[y_var] <= y_min))
+	for var in x_vars:
+		temp[var][below_ymin] = np.nan
+	temp[y_var][below_ymin] = np.nan
+	predicted = copy.deepcopy(temp[y_var])
 	
-	predicted = [[0. for i in temp[y_var][0]] for j in temp[y_var]]
-	
-	if cnc:
-		cloud = (temp[y_var] > 0)
-		temp[y_var][cloud] = 1
-	
-	if True in np.isnan(temp[y_var]):
-		print('nan stilll in')
 	for row in range(len(temp['sst'])):
 		for col in range(len(temp['sst'][row])):
 			temp_xai = []
 			for var in x_vars:
 				temp_xai.append(temp[var][row][col])
-			if (True not in np.isnan(temp_xai)) and (temp[y_var][row][col] >= 0):
+			if (True not in np.isnan(temp_xai)):
 				predicted_y = predictor.predict(np.array([temp_xai]))[0]
 				predicted[row][col] = predicted_y
 			else:
-				predicted[row][col] = 0.
+				predicted[row][col] = np.nan
+			
 	predicted = np.array(predicted)
-	bad = (np.isnan(temp[y_var]))
-	predicted[bad] = np.nan
+	predicted[(np.isnan(predicted))] = 0.
+	temp[y_var][(np.isnan(temp[y_var]))] = 0.
 	
 	mse = np.nanmean(np.square(predicted - temp[y_var]))
 	max_all = max([np.nanmax(predicted), np.nanmax(temp[y_var])])
-	#ss = ssim(temp[y_var], predicted, data_range = max_all)
+	ss = ssim(temp[y_var], predicted, data_range = max_all)
 	
-	
+	print(np.amin(predicted), np.amin(temp[y_var]))
 	
 	plt.subplot(131)
 	plt.title('Actual')
@@ -113,7 +115,7 @@ def create_swath(filename, predictor, y_var, x_vars, cnc = False):
 	plt.title('Difference')
 	plt.pcolormesh(temp['modis_lons'], temp['modis_lats'], temp[y_var] - predicted, cmap = 'inferno')
 	plt.colorbar()
-	#plt.suptitle('{}'.format(ss) + ' SSIM ' + '{}'.format(round(mse, 2)) + ' MSE')
+	plt.suptitle('{}'.format(ss) + ' SSIM ' + '{}'.format(round(mse, 2)) + ' MSE')
 	plt.show()
 	
 	
