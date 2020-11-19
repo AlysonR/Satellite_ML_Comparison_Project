@@ -2,6 +2,7 @@ import numpy as np
 import subprocess
 import sys
 from netCDF4 import Dataset
+from pyhdf.SD import SD, SDC
 import matplotlib.pyplot as plt
 import tools
 
@@ -13,11 +14,11 @@ def get_file(year, month, modis_lats, modis_lons):
 	url_aero = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2TMNXAER.5.12.4/{}/MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, year, month)
 	url_3d = 'https://goldsmr3.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MAIMNPANA.5.2.0/{}/MERRA300.prod.assim.instM_3d_ana_Np.{}{}.hdf'.format(year, year, month)
 	url_1d = 'https://goldsmr2.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MATMNXSLV.5.2.0/{}/MERRA300.prod.assim.tavgM_2d_slv_Nx.{}{}.hdf'.format(year, year, month)
-	print('Getting aerosol')
+	print('Getting aerosol', url_aero)
 	subprocess.call(call_string.format(url_aero).split())
-	print('Getting 3d meteorology')
+	print('Getting 3d meteorology', url_3d)
 	subprocess.call(call_string.format(url_3d).split())
-	print('Getting 1d meteorology')
+	print('Getting 1d meteorology', url_1d)
 	subprocess.call(call_string.format(url_1d).split())
 	
 	aerosol_name = 'MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, month)
@@ -57,38 +58,40 @@ def get_file(year, month, modis_lats, modis_lons):
 	
 	################################################
 	
-	met_3d_data = Dataset(met_3d_name, 'r')
+	met_3d_data = SD(met_3d_name, SDC.READ)
 	
-	merra_lats = met_3d_data['YDim'][:]
-	merra_lons = met_3d_data['XDim'][:]
-	heights = met_3d_data['Height'][:].tolist()
+	merra_lats = met_3d_data.select('YDim').get()
+	merra_lons = met_3d_data.select('XDim').get()
+	heights = met_3d_data.select('Height').get().tolist()
 	i_700 = heights.index(700.)
 	i_500 = heights.index(500.)
 	i_850 = heights.index(850.)
 	i_250 = heights.index(250.)
 	
-	surface_pres = met_3d_data['PS'][:][0]
-	temps = met_3d_data['T'][:][0]
-	spec_humidity = met_3d_data['QV'][:][0]
+	surface_pres = met_3d_data.select('PS').get()[0]
+	temps = met_3d_data.select('T').get()[0]
+	spec_humidity = met_3d_data.select('QV').get()[0]
 	
-	U_profile = met_3d_data['U'][:][0]
-	V_profile = met_3d_data['V'][:][0]
+	U_profile = met_3d_data.select('U').get()[0]
+	V_profile = met_3d_data.select('V').get()[0]
 	
 	subprocess.call(remove_string.format(met_3d_name).split())
 	
 	################################################
 	
-	met_1d_data = Dataset(met_1d_name, 'r')
+	met_1d_data = SD(met_1d_name, SDC.READ)
 	
-	merra_dict['w500'] = met_1d_data['OMEGA500'][:][0]
-	surface_temps = met_1d_data['TS'][:][0]
-	
+	merra_dict['w500'] = met_1d_data.select('OMEGA500').get()[0]
+	surface_temps = met_1d_data.select('TS').get()[0]
+	bad = (surface_temps > 500)
+	surface_temps[bad] = np.nan
 	subprocess.call(remove_string.format(met_1d_name).split())
 	
 	################################################
 	
 	find_LTS = np.vectorize(tools.find_LTS)
 	merra_dict['LTS'] = find_LTS(surface_temps, temps[i_700, :, :], surface_pres)
+	
 	merra_dict['upper_level_U'] = U_profile[i_250, :, :]
 	merra_dict['upper_level_V'] = V_profile[i_250, :, :]
 	merra_dict['upper_level_winds'] = np.sqrt(merra_dict['upper_level_U'] **2 + merra_dict['upper_level_V'] ** 2)
