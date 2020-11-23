@@ -11,7 +11,12 @@ def get_file(year, month, modis_lats, modis_lons):
 	remove_string = 'rm {}'
 	call_string= 'curl -n -c ~/.urs_cookies -b ~/.urs_cookies -LJO --url {}'
 	#url_aero = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_DIURNAL/M2TUNXAER.5.12.4/{}/MERRA2_300.tavgU_2d_aer_Nx.{}{}.nc4'.format(year, year, month)
-	url_aero = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2TMNXAER.5.12.4/{}/MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, year, month)
+	if int(year) > 2010:
+		url_aero = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2TMNXAER.5.12.4/{}/MERRA2_400.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, year, month)
+		aerosol_name = 'MERRA2_400.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, month)
+	else:
+		url_aero = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2TMNXAER.5.12.4/{}/MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, year, month)
+		aerosol_name = 'MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, month)
 	url_3d = 'https://goldsmr3.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MAIMNPANA.5.2.0/{}/MERRA300.prod.assim.instM_3d_ana_Np.{}{}.hdf'.format(year, year, month)
 	url_1d = 'https://goldsmr2.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MATMNXSLV.5.2.0/{}/MERRA300.prod.assim.tavgM_2d_slv_Nx.{}{}.hdf'.format(year, year, month)
 	print('Getting aerosol', url_aero)
@@ -21,11 +26,11 @@ def get_file(year, month, modis_lats, modis_lons):
 	print('Getting 1d meteorology', url_1d)
 	subprocess.call(call_string.format(url_1d).split())
 	
-	aerosol_name = 'MERRA2_300.tavgM_2d_aer_Nx.{}{}.nc4'.format(year, month)
+	
 	met_3d_name = 'MERRA300.prod.assim.instM_3d_ana_Np.{}{}.hdf'.format(year, month)
 	met_1d_name = 'MERRA300.prod.assim.tavgM_2d_slv_Nx.{}{}.hdf'.format(year, month)
 	################################################
-	
+	print(aerosol_name)
 	aerosol_data = Dataset(aerosol_name, 'r')
 	aerosol_lats = aerosol_data['lat'][:]
 	aerosol_lons = aerosol_data['lon'][:]
@@ -57,7 +62,7 @@ def get_file(year, month, modis_lats, modis_lons):
 	subprocess.call(remove_string.format(aerosol_name).split())
 	
 	################################################
-	
+	print(met_3d_name)
 	met_3d_data = SD(met_3d_name, SDC.READ)
 	
 	merra_lats = met_3d_data.select('YDim').get()
@@ -113,5 +118,7 @@ def get_file(year, month, modis_lats, modis_lons):
 			merra_dict[variable] = tools.interp(merra_dict[variable], aerosol_lats, aerosol_lons, modis_lats, modis_lons)	
 		else:
 			merra_dict[variable] = tools.interp(merra_dict[variable], merra_lats, merra_lons, modis_lats, modis_lons)	
-		
+	for var in merra_dict.keys():
+		bad = (merra_dict[var] > 10000)
+		merra_dict[var][bad] = np.nan
 	return merra_dict

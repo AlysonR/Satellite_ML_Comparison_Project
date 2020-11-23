@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 import get_merra
 import get_seawifs
 import sys
+import pyhdf
 import get_sst
 
-year = '2004'
+#merra only up to 2016
+year = '2002'
 year_dict = {}
 variables = ['latitudes', 'longitudes', 'sst', 'lwp', 'iwp', 'cth', 'cod', 'l_re', 'i_re', 'cf', 'modis_aod']
 aerosol_vars = ['bc_ang', 'bc_aod', 'bc_ai', 'du_ang', 'du_aod', 'du_ai', 'oc_ang', 'oc_aod', 'oc_ai', 'su_ang', 'su_aod', 'su_ai', 'ss_ang', 'ss_aod', 'ss_ai', 'tot_ang', 'tot_aod', 'tot_ai', 'w500', 'LTS', 'upper_level_U', 'upper_level_V', 'upper_level_winds', 'U_850', 'V_850', 'U_500', 'V_500', 'RH850', 'RH700']
@@ -33,7 +35,15 @@ for filename in sorted(glob.glob(aqua_modis_monthly_dir + '*/*.hdf')):
 		
 		print('getting MODIS')
 		latitudes, longitudes, lwp, iwp, cth, cod, l_re, i_re, cloudfrac, aod = get_modis_monthly.get_data(filename)
+	
+		print('getting sst')
+		ssts = get_sst.get_sst_avhrr(year, month, latitudes, longitudes)
 		
+		print('getting MERRA')
+		merra_vars = get_merra.get_file(year, month, latitudes, longitudes)
+		for var in merra_vars.keys():
+			year_dict[var].append(merra_vars[var])
+			
 		year_dict['latitudes'] = latitudes
 		year_dict['longitudes'] = longitudes	
 		year_dict['lwp'].append(lwp)
@@ -44,17 +54,9 @@ for filename in sorted(glob.glob(aqua_modis_monthly_dir + '*/*.hdf')):
 		year_dict['i_re'].append(i_re)
 		year_dict['cf'].append(cloudfrac)
 		year_dict['modis_aod'].append(aod)
-		
-		print('getting sst')
-		ssts = get_sst.get_sst_avhrr(year, month, latitudes, longitudes)
 		year_dict['sst'].append(ssts)
 		
-		
-		print('getting MERRA')
-		merra_vars = get_merra.get_file(year, month, latitudes, longitudes)
-		for var in merra_vars.keys():
-			year_dict[var].append(merra_vars[var])
-	except IndexError:
+	except:
 		print('Skipping missing MERRA')	
 np.save(year, year_dict)
 	

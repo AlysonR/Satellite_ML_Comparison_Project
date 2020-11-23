@@ -55,6 +55,7 @@ def get_sst_avhrr(year, month, modis_lats, modis_lons):
 	lats = lats - 90.
 	
 	mean_sst = tools.interp(mean_sst, lats, lons, modis_lats, modis_lons)
+	mean_sst = np.rot90(np.transpose(mean_sst))
 	ice = (mean_sst < 230)
 	mean_sst[ice] = np.nan
 	return mean_sst
