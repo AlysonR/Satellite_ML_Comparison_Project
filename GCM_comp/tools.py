@@ -7,6 +7,13 @@ Rv = 461.
 Lv = 2.501 * 10**6
 eps = .622
 
+def interp(data, start_lat, start_lon, end_lat, end_lon):
+	from scipy import interpolate
+	import numpy as np
+	function = interpolate.interp2d(start_lon, start_lat, data, kind = 'linear')
+	new_data = function(end_lon, end_lat)
+	return new_data
+
 def adiabatic_theta(T, p):
 	global kd
 	#given a Temperature and pressure at some level
@@ -22,8 +29,10 @@ def find_LTS(Ts, T700, ps):
 	return LTS
 	
 #X_vars = ['LTS', 'sst', 'w500', 'RH850', 'tot_ai']
-def predict(model_save_name, X):
+def predict(model_save_name, X, return_model = False):
 	import pickle
 	trained_model = pickle.load(open(model_save_name, 'rb'))
+	if return_model:
+		return trained_model
 	predicted = trained_model.predict(X)
 	return predicted

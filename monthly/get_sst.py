@@ -3,9 +3,8 @@ import subprocess
 import sys
 from pyhdf.SD import SD, SDC
 import glob
+from netCDF4 import Dataset
 import matplotlib.pyplot as plt
-sys.path.append('/home/users/rosealyd/ML_sat_obs/')
-import get_SST
 import tools
 
 def get_sst_airs(year, month):
@@ -38,6 +37,24 @@ def get_sst_airs(year, month):
 	#sst = sst_data['
 	sys.exit()
 	return
+	
+def find_sst(day, month, year):
+	#daily
+	sst_dir = '/neodc/esacci/sst/data/gmpe/CDR_V2/L4/v2.0/{}/{}/{}/'.format(year, month, day)
+	print(sst_dir)
+	filename = glob.glob(sst_dir + '*.nc')[0]
+	
+	sst_dataset = Dataset(filename, mode = 'r')
+	
+	sst = sst_dataset['analysed_sst'][:]
+	sst = sst[0, : , :]
+
+	latitudes = sst_dataset['lat'][:]
+	longitudes = sst_dataset['lon'][:]
+	
+	
+	return sst, latitudes, longitudes
+	
 
 def get_sst_avhrr(year, month, modis_lats, modis_lons):
 	import calendar
@@ -46,18 +63,15 @@ def get_sst_avhrr(year, month, modis_lats, modis_lons):
 	month_mean = []
 	for day in range(1, days_in_month[-1] + 1):
 		day = datetime.date(year = int(year), month = int(month), day = int(day)).strftime('%d')
-		ssts, lats, lons = get_SST.find_sst(day, month, year, return_early = True)
-		month_mean.append(ssts.reshape(lats.shape[0], lons.shape[0]))
-		
+		ssts, lats, lons = find_sst(day, month, year, return_early = True)
+		month_mean.append(ssts.filled(-999.))
+	
 	mean_sst = np.nanmean(month_mean, axis = 0)
-	
-	lons = lons - 180.
-	lats = lats - 90.
-	
 	mean_sst = tools.interp(mean_sst, lats, lons, modis_lats, modis_lons)
-	mean_sst = np.rot90(np.transpose(mean_sst))
-	ice = (mean_sst < 230)
+	
+	ice = (mean_sst < 253.15)
 	mean_sst[ice] = np.nan
+	
 	return mean_sst
 	
 	
