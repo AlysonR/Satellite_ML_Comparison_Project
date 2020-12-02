@@ -6,6 +6,7 @@ from skimage.metrics import structural_similarity as ssim
 
 year_dir = '/home/users/rosealyd/ML_sat_obs/monthly/'
 
+
 def get_as_X_y(X_vars, y_var, year):
 	global year_dir
 	year_data = np.load(year_dir + str(year)+ '.npy', allow_pickle = True).item()
@@ -66,28 +67,34 @@ def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
 				else:
 					pred_y[lat_row][lon_tile] = predictor.predict([xai])[0]
 		land = np.isnan(pred_y)
-		year_data['cf'][month][land] = np.nan
-		over = (pred_y > 1.)
-		pred_y[over] = 1.
+		year_data[y_var][month][land] = np.nan
+		over = (pred_y > np.max(year_data[y_var][month]))
+		pred_y[over] = np.max(year_data[y_var][month])
 		print(np.nanmean(pred_y), 'predicted mean')
-		print(np.nanmean(year_data['cf'][month]), 'actual mean')
+		print(np.nanmean(year_data[y_var][month]), 'actual mean')
 		mean_diffs.append(np.nanmean(pred_y) - np.nanmean(year_data['cf'][month]))
-		'''plt.subplot(131)
-		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y, vmin = 0, vmax = 1., cmap = cmap.get_bluemap())
-		plt.title('Predicted CF')
+		
+		plot_max = max([np.nanmax(pred_y), np.nanmax(year_data[y_var][month])])
+		plot_min = min([np.nanmin(pred_y), np.nanmin(year_data[y_var][month])])
+		'''
+		plt.subplot(131)
+		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y, cmap = 'cividis', vmin = plot_min, vmax = plot_max)
+		plt.title('Predicted liquid Re')
 		plt.colorbar()
 		plt.subplot(132)
-		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], year_data['cf'][month], vmin = 0, vmax = 1, cmap = cmap.get_bluemap())
-		plt.title('MODIS Monthly CF')
+		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], year_data[y_var][month], cmap = 'cividis',  vmin = plot_min, vmax = plot_max)
+		plt.title('MODIS Monthly liquid Re')
 		plt.colorbar()
 		plt.subplot(133)
-		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y - year_data['cf'][month], vmin = -1, vmax = 1, cmap = cmap.get_cmap())
+		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y - year_data[y_var][month], cmap = cmap.get_cmap())
 		plt.colorbar()
 		plt.suptitle('{} {}'.format(date.strftime('%B'), date.strftime('%Y')))
 		plt.show()'''
 		pred_y[np.isnan(pred_y)] = 0.
-		year_data['cf'][month][np.isnan(year_data['cf'][month])] = 0.
-		similarity = ssim(pred_y, year_data['cf'][month], data_range = 1.)
+		year_data[y_var][month][np.isnan(year_data[y_var][month])] = 0.
+		
+		similarity = ssim(pred_y, year_data[y_var][month], data_range = max([np.amax(pred_y), np.amax(year_data[y_var][month])]))
+		print(similarity)
 		ssims.append(similarity)
 	return ssims, mean_diffs
 
