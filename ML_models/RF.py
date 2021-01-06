@@ -5,24 +5,17 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import RFE
 from sklearn.inspection import partial_dependence
 from sklearn.metrics import mean_squared_error
-import sklearn
 import src
-from sklearn import tree
 import sys
 sys.path.append('/home/users/rosealyd/ML_sat_obs/monthly/')
 import get_year
 from sklearn.tree import export_graphviz
 from sklearn.metrics import confusion_matrix
-import copy
 import glob
-import graphviz
+import pickle
 
 quick_plot = False
 warm = True
-
-
-
-print('The scikit-learn version is {}.'.format(sklearn.__version__))
 
 tiles_dir = '/home/users/rosealyd/ML_sat_obs/cloudy_tiles/'
 y_var = 'cf'
@@ -53,6 +46,8 @@ print([round(p, 2) for p in regression.feature_importances_.tolist()])
 print(regression.score(test_X, test_y), 'score')
 pred_y = regression.predict(test_X)
 print(mean_squared_error(test_y, pred_y), 'overall mse')
+
+pickle.dump(regression, open('latest_RF.sav', 'wb'))
 
 get_year.plot_year(regression, X_vars, y_var, 2010)
 #for filename in files:
