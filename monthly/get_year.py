@@ -2,21 +2,25 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import cmap
+import copy
 from skimage.metrics import structural_similarity as ssim
 
 year_dir = '/home/users/rosealyd/ML_sat_obs/monthly/'
 
 
-def get_as_X_y(X_vars, y_var, year):
+def get_as_X_y(X_vars, y_var, year, double_y = False):
 	global year_dir
 	year_data = np.load(year_dir + str(year)+ '.npy', allow_pickle = True).item()
 	
 	xais = []
 	yais = []
-	print(year_data.keys())
-	X_vars.append(y_var)
+	temp = copy.deepcopy(X_vars)
+	if double_y:
+		temp.extend(y_var)
+	else:
+		temp.append(y_var)
 	
-	for var in X_vars:
+	for var in temp:
 		temp = []
 		for month in year_data[var]:
 			test = month.ravel()
@@ -32,15 +36,19 @@ def get_as_X_y(X_vars, y_var, year):
 		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[-1]) if True not in np.isnan(list(items))]
 	if len(xais) == 9:
 		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[7], xais[-1]) if True not in np.isnan(list(items))]
-	
+	if len(xais) == 10:
+		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[7], xais[8], xais[-1]) if True not in np.isnan(list(items))]
+		
 	xais = np.array(xais)
 	
-	ys = xais[:, -1]
+	
+	if double_y:
+		ys = xais[:, -2:]
+	else:
+		ys = xais[:, -1]
 	xais = xais[:, :-1]
 	
-	X_vars.pop(-1)
-	
-	return xais, ys, X_vars, [year_dir + str(year)]
+	return xais, ys, [year_dir + str(year)]
 
 
 def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
@@ -76,7 +84,7 @@ def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
 		
 		plot_max = max([np.nanmax(pred_y), np.nanmax(year_data[y_var][month])])
 		plot_min = min([np.nanmin(pred_y), np.nanmin(year_data[y_var][month])])
-		'''
+		
 		plt.subplot(131)
 		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y, cmap = 'cividis', vmin = plot_min, vmax = plot_max)
 		plt.title('Predicted liquid Re')
@@ -89,7 +97,7 @@ def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
 		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y - year_data[y_var][month], cmap = cmap.get_cmap())
 		plt.colorbar()
 		plt.suptitle('{} {}'.format(date.strftime('%B'), date.strftime('%Y')))
-		plt.show()'''
+		plt.show()
 		pred_y[np.isnan(pred_y)] = 0.
 		year_data[y_var][month][np.isnan(year_data[y_var][month])] = 0.
 		

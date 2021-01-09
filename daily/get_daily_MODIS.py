@@ -5,9 +5,13 @@ import matplotlib.pyplot as plt
 import sys
 import numpy as np
 
+alpha = .25
+
 modis_daily_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/modis/modis_c61/mod08_d3/'
 
 def get_day(year, month, day):
+	global alpha, modis_daily_dir
+	
 	date = datetime.date(year = int(year), month = int(month), day = int(day))
 	diy = date.strftime('%j')
 	filename = glob.glob(modis_daily_dir + '*A{}{}*.hdf'.format(year, diy))[0]
@@ -50,16 +54,35 @@ def get_day(year, month, day):
 	bad = (i_re < -1)
 	i_re[bad] = np.nan
 	
-	cf_attrs = modis_data.select('Cloud_Fraction_Mean').attributes()
-	cf = modis_data.select('Cloud_Fraction_Mean').get().astype(float) * cf_attrs['scale_factor']
+	cf_name = 'Cloud_Retrieval_Fraction_Combined'
+	cf_attrs = modis_data.select(cf_name).attributes()
+	cf = (modis_data.select(cf_name).get().astype(float) * cf_attrs['scale_factor']) - cf_attrs['add_offset']
 	bad = (cf < 0)
 	cf[bad] = np.nan
+	
+	dis_c_aer = modis_data.select('Aerosol_Avg_Cloud_Distance_Land_Ocean_Pixel_Counts').get().astype(float)
+	bad = (dis_c_aer < -1)
+	dis_c_aer[bad] = np.nan
+	
+	ml_frac = modis_data.select('ML_Fraction_Combined').get().astype(float)
+	bad = (ml_frac < -1)
+	ml_frac[bad] = np.nan
+	ml_ice_frac = modis_data.select('ML_Fraction_Ice_Pixel_Counts').get().astype(float)
+	bad = (ml_ice_frac < -1)
+	ml_ice_frac[bad] = np.nan
+	ml_liq_frac = modis_data.select('ML_Fraction_Liquid_Pixel_Counts').get().astype(float)
+	bad = (ml_liq_frac < -1)
+	ml_liq_frac[bad] = np.nan
+	
 	
 	aod_attrs = modis_data.select('AOD_550_Dark_Target_Deep_Blue_Combined_Mean').attributes()
 	aod = modis_data.select('AOD_550_Dark_Target_Deep_Blue_Combined_Mean').get().astype(float) * aod_attrs['scale_factor']
 	bad = (aod < 0)
 	aod[bad] = np.nan
 	
-	modis_dict = {'cwp': cwp, 'iwp': iwp, 'cth': cth, 'cod': cod, 'l_re': l_re, 'i_re': i_re, 'cf': cf, 'modis_aod': aod}
+	cdnc = (cod / ((cwp ** (5/6)) * alpha)) ** 3
+	cdnc[(cdnc < 1)] = np.nan
+	
+	modis_dict = {'cwp': cwp, 'iwp': iwp, 'cth': cth, 'cod': cod, 'l_re': l_re, 'i_re': i_re, 'cf': cf, 'modis_aod': aod, 'ml_frac': ml_frac, 'ml_ice_frac': ml_ice_frac, 'ml_liq_frac': ml_liq_frac, 'd_ctoaer': dis_c_aer}
 	
 	return modis_latitudes, modis_longitudes, modis_dict

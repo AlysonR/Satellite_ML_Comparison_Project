@@ -121,8 +121,8 @@ def get_file(year, month, modis_lats, modis_lons):
 	find_LTS = np.vectorize(tools.find_LTS)
 	merra_dict['LTS'] = find_LTS(surface_temps, temps[i_700, :, :], surface_pres)
 
-	merra_dict['upper_level_U'] = U_profile[i_250, :, :]
-	merra_dict['upper_level_V'] = V_profile[i_250, :, :]
+	merra_dict['u250'] = U_profile[i_250, :, :]
+	merra_dict['v250'] = V_profile[i_250, :, :]
 	merra_dict['upper_level_winds'] = np.sqrt(merra_dict['upper_level_U'] **2 + merra_dict['upper_level_V'] ** 2)
 	
 	merra_dict['U_850'] = U_profile[i_850, :, :]

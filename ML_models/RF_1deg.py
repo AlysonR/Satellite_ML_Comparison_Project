@@ -19,7 +19,7 @@ print('Getting data')
 
 X = []
 y = []
-years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010]
+years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013]
 print(years[0])
 if daily:
 	features_dict = get_day.get_single_X_y(X_vars, y_var, years[0])
@@ -54,14 +54,19 @@ for area in features_dict.keys():
 	X = np.array(features_dict[area]['X'])
 	y = np.array(features_dict[area]['y'])
 	print(X.shape)
-	train_X, test_X, train_y, test_y = train_test_split(X, y, test_size = .1, random_state = 37)
+	train_X, test_X, train_y, test_y = train_test_split(X, y, test_size = .2, random_state = 37)
 	reg = RandomForestRegressor()
+	reg.fit(train_X, train_y)
 	pred_y = reg.predict(test_X)
-	print(mean_squared_error(test_y, pred_y), 'mse')
-	print(r2_score(test_y, pred_y), 'r2')
+	mse = mean_squared_error(test_y, pred_y)
+	
+	r = r2_score(test_y, pred_y)
 	print(np.max(pred_y), 'max learned y')
-	#lgbm.plot_importance(bst_1)
-	#plt.show()
-	importances_dict[area] = reg_1.feature_importances_
+	
+	importances_dict[area] = {}
+	importances_dict[area]['imps'] = reg.feature_importances_
+	importances_dict[area]['mse'] = mse
+	importances_dict[area]['r2'] = r
 	print(importances_dict[area])
-	sys.exit()
+	with open('imp_dic.txt', 'wb') as f:
+		pickle.dump(importances_dict, f)

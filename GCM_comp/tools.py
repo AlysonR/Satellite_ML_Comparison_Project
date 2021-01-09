@@ -36,3 +36,4 @@ def predict(model_save_name, X, return_model = False):
 		return trained_model
 	predicted = trained_model.predict(X)
 	return predicted
+

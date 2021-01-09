@@ -1,0 +1,7 @@
+*.npy
+__pycache__
+*.png
+*.hdf
+*.txt
+*.pyc
+*.sav

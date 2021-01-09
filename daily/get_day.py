@@ -1,11 +1,13 @@
 import numpy as np
 import glob
 import sys
+import matplotlib.pyplot as plt
 
 def get_single_X_y(X_vars, y_var, year):
-	months = glob.glob('*_{}_test.npy'.format(year))
+	months = glob.glob('/home/users/rosealyd/ML_sat_obs/daily/npys/*_{}_test.npy'.format(year))
 	features_dict = {}
 	temp = np.load(months[0], allow_pickle = True).item()
+	
 	for lat in temp['lats']:
 		for lon in temp['lons']:
 			features_dict['{}_{}'.format(lat, lon)] = {'X': [], 'y': []}
@@ -25,10 +27,9 @@ def get_single_X_y(X_vars, y_var, year):
 					if True not in np.isnan(temp_xai) and True not in np.isnan([month_data[y_var][day][n_row][n_tile]]):
 						features_dict['{}_{}'.format(lat, lon)]['X'].append(temp_xai)
 						features_dict['{}_{}'.format(lat, lon)]['y'].append(month_data[y_var][day][n_row][n_tile])
-	print(np.array(features_dict['1.5_1.5']['X']).shape)
-	
-	sys.exit()
+	print(np.array(features_dict['0.5_0.5']['X']).shape)
+	return features_dict
 
 
-get_single_X_y(['EIS', 'sst', 'tot_ang', 'tot_aod'], 'cf', 2007)
+#get_single_X_y(['EIS', 'sst', 'tot_ang', 'tot_aod'], 'cf', 2007)
 
