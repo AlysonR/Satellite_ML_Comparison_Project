@@ -9,10 +9,11 @@ eps = .622
 
 def interp(data, start_lat, start_lon, end_lat, end_lon):
 	from scipy import interpolate
-	import numpy as np
+	
 	function = interpolate.interp2d(start_lon, start_lat, data, kind = 'linear')
 	new_data = function(end_lon, end_lat)
 	return new_data
+
 
 def adiabatic_theta(T, p):
 	global kd
