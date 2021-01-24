@@ -23,6 +23,7 @@ def get_file(year, month, modis_lats, modis_lons):
 	url_1d = 'https://goldsmr2.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MATMNXSLV.5.2.0/{}/MERRA300.prod.assim.tavgM_2d_slv_Nx.{}{}.hdf'.format(year, year, month)
 	url_pbl = 'https://goldsmr1.gesdisc.eosdis.nasa.gov/data/MERRA_MONTHLY/MATMFXCHM.5.2.0/{}/MERRA300.prod.assim.tavgM_2d_chm_Fx.{}{}.hdf'.format(year, year, month)
 	print('Getting aerosol', url_aero)
+	print(call_string.format(url_aero).split())
 	subprocess.call(call_string.format(url_aero).split())
 	print('Getting 3d meteorology', url_3d)
 	subprocess.call(call_string.format(url_3d).split())
@@ -123,7 +124,7 @@ def get_file(year, month, modis_lats, modis_lons):
 
 	merra_dict['u250'] = U_profile[i_250, :, :]
 	merra_dict['v250'] = V_profile[i_250, :, :]
-	merra_dict['upper_level_winds'] = np.sqrt(merra_dict['upper_level_U'] **2 + merra_dict['upper_level_V'] ** 2)
+	merra_dict['upper_level_winds'] = np.sqrt(merra_dict['u250'] **2 + merra_dict['v250'] ** 2)
 	
 	merra_dict['U_850'] = U_profile[i_850, :, :]
 	merra_dict['V_850'] = V_profile[i_850, :, :]

@@ -4,16 +4,15 @@ import datetime
 import get_modis_monthly
 import matplotlib.pyplot as plt
 import get_merra
-import get_seawifs
 import sys
 import pyhdf
 import get_sst
 
 #merra only up to 2016
-year = '2002'
+year = '2016'
 year_dict = {}
 variables = ['latitudes', 'longitudes', 'sst', 'lwp', 'iwp', 'cth', 'cod', 'l_re', 'i_re', 'cf', 'modis_aod']
-aerosol_vars = ['lats', 'lons', 'bc_ang', 'bc_aod', 'bc_ai', 'du_ang', 'du_aod', 'du_ai', 'oc_ang', 'oc_aod', 'oc_ai', 'su_ang', 'su_aod', 'su_ai', 'ss_ang', 'ss_aod', 'ss_ai', 'tot_ang', 'tot_aod', 'tot_ai', 'w500', 'LTS', 'upper_level_U', 'upper_level_V', 'upper_level_winds', 'U_850', 'V_850', 'EIS', 'U_700', 'V_700','winds_700', 'U_500', 'V_500', 'RH850', 'RH700']
+aerosol_vars = ['lats', 'lons', 'bc_ang', 'bc_aod', 'bc_ai', 'du_ang', 'du_aod', 'du_ai', 'oc_ang', 'oc_aod', 'oc_ai', 'su_ang', 'su_aod', 'su_ai', 'ss_ang', 'ss_aod', 'ss_ai', 'tot_ang', 'tot_aod', 'tot_ai', 'w500', 'LTS', 'upper_level_U', 'upper_level_V', 'upper_level_winds', 'U_850', 'V_850', 'EIS', 'U_700', 'V_700','winds_700', 'U_500', 'V_500', 'RH850', 'RH700', 'u250', 'v250']
 
 for varname in variables:
 	year_dict[varname] = []
@@ -57,7 +56,7 @@ for filename in sorted(glob.glob(aqua_modis_monthly_dir + '*/*.hdf')):
 		year_dict['modis_aod'].append(aod)
 		year_dict['sst'].append(ssts)
 		
-	except:
+	except IndexError:
 		print('Skipping missing MERRA')	
 np.save(year, year_dict)
 	

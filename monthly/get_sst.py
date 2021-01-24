@@ -63,7 +63,7 @@ def get_sst_avhrr(year, month, modis_lats, modis_lons):
 	month_mean = []
 	for day in range(1, days_in_month[-1] + 1):
 		day = datetime.date(year = int(year), month = int(month), day = int(day)).strftime('%d')
-		ssts, lats, lons = find_sst(day, month, year, return_early = True)
+		ssts, lats, lons = find_sst(day, month, year)
 		month_mean.append(ssts.filled(-999.))
 	
 	mean_sst = np.nanmean(month_mean, axis = 0)

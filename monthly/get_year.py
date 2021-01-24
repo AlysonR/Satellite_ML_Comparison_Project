@@ -1,5 +1,7 @@
 import numpy as np
 import sys
+sys.path.append('/home/users/rosealyd/ML_sat_obs/GCM_comp/')
+import hadgem_comp
 import matplotlib.pyplot as plt
 import cmap
 import copy
@@ -8,65 +10,55 @@ from skimage.metrics import structural_similarity as ssim
 year_dir = '/home/users/rosealyd/ML_sat_obs/monthly/'
 
 
-def get_as_X_y(X_vars, y_var, year, double_y = False):
+def get_as_X_y(X_vars, y_var, year):
 	global year_dir
 	year_data = np.load(year_dir + str(year)+ '.npy', allow_pickle = True).item()
 	
 	xais = []
 	yais = []
-	temp = copy.deepcopy(X_vars)
-	if double_y:
-		temp.extend(y_var)
-	else:
-		temp.append(y_var)
-	
-	for var in temp:
+	temp_vars = copy.deepcopy(X_vars)
+	temp_vars.append(y_var)
+	for month in range(len(year_data['sst'])):
 		temp = []
-		for month in year_data[var]:
-			test = month.ravel()
-			temp.extend(test)
-		xais.append(temp)
-	print(np.array(xais).shape)
-	
-	if len(xais) == 6:
-		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[-1]) if True not in np.isnan(list(items))]
-	if len(xais) == 7:
-		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[-1]) if True not in np.isnan(list(items))]
-	if len(xais) == 8:
-		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[-1]) if True not in np.isnan(list(items))]
-	if len(xais) == 9:
-		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[7], xais[-1]) if True not in np.isnan(list(items))]
-	if len(xais) == 10:
-		xais = [items for items in zip(xais[0], xais[1], xais[2], xais[3], xais[4], xais[5], xais[6], xais[7], xais[8], xais[-1]) if True not in np.isnan(list(items))]
+		for var in temp_vars:
+			test = year_data[var][month].ravel()
+			temp.append(test)
+		temp = np.array(temp)
+		if month == 0:
+			xais = temp
+		else:
+			xais = np.hstack((xais, temp))
 		
+		
+	
 	xais = np.array(xais)
 	
+	xais = xais[:, ~np.isnan(xais).any(axis = 0)]
 	
-	if double_y:
-		ys = xais[:, -2:]
-	else:
-		ys = xais[:, -1]
-	xais = xais[:, :-1]
 	
-	return xais, ys, [year_dir + str(year)]
+	ys = xais[-1, :]
+	xais = xais[:-1, :]
+	return xais, ys
 
 
-def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
+def plot_year(predictor, X_vars, y_var, year, GCM = False):
 	global year_dir
 	import datetime
 	if GCM:
-		year_data = GCM_data
+		year_data = hadgem_comp.get_hadgem()
+		y_var = 'cf'
+		year = 1850
 	else:
 		year_data = np.load(year_dir + str(year) + '.npy', allow_pickle = True).item()
 	pred_y = np.zeros(year_data[y_var][0].shape)
 	ssims = []
 	mean_diffs = []
-	for month in range(len(year_data['LTS'])):
+	for month in range(len(year_data['sst']))[10:]:
 		date = datetime.date(month = month + 1, year = year, day = 1)
-		print(date.strftime('%B'))
+		print(date.strftime('%B'), 'date')
 		
-		for lat_row in range(len(year_data['LTS'][month])):
-			for lon_tile in range(len(year_data['LTS'][month][lat_row])):
+		for lat_row in range(len(year_data['sst'][month])):
+			for lon_tile in range(len(year_data['sst'][month][lat_row])):
 				xai = []
 				for var in X_vars:
 					xai.append(year_data[var][month][lat_row][lon_tile])
@@ -74,6 +66,7 @@ def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
 					pred_y[lat_row][lon_tile] = np.nan
 				else:
 					pred_y[lat_row][lon_tile] = predictor.predict([xai])[0]
+				print(xai)
 		land = np.isnan(pred_y)
 		year_data[y_var][month][land] = np.nan
 		over = (pred_y > np.max(year_data[y_var][month]))
@@ -85,22 +78,24 @@ def plot_year(predictor, X_vars, y_var, year, GCM = False, GCM_data = None):
 		plot_max = max([np.nanmax(pred_y), np.nanmax(year_data[y_var][month])])
 		plot_min = min([np.nanmin(pred_y), np.nanmin(year_data[y_var][month])])
 		
-		plt.subplot(131)
+		plt.pcolormesh(pred_y)
+		plt.colorbar()
+		plt.show()
+		
+		plt.subplot(121)
 		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y, cmap = 'cividis', vmin = plot_min, vmax = plot_max)
-		plt.title('Predicted liquid Re')
+		plt.title('Predicted CF')
 		plt.colorbar()
-		plt.subplot(132)
-		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], year_data[y_var][month], cmap = 'cividis',  vmin = plot_min, vmax = plot_max)
-		plt.title('MODIS Monthly liquid Re')
-		plt.colorbar()
-		plt.subplot(133)
+		plt.subplot(122)
 		plt.pcolormesh(year_data['longitudes'], year_data['latitudes'], pred_y - year_data[y_var][month], cmap = cmap.get_cmap())
+		plt.title('Differenced CF')
 		plt.colorbar()
 		plt.suptitle('{} {}'.format(date.strftime('%B'), date.strftime('%Y')))
+		plt.savefig('GCM Test')
 		plt.show()
 		pred_y[np.isnan(pred_y)] = 0.
 		year_data[y_var][month][np.isnan(year_data[y_var][month])] = 0.
-		
+		sys.exit()
 		similarity = ssim(pred_y, year_data[y_var][month], data_range = max([np.amax(pred_y), np.amax(year_data[y_var][month])]))
 		print(similarity)
 		ssims.append(similarity)
@@ -139,6 +134,18 @@ def get_single_X_y(X_vars, y_var, year):
 	
 	return features_dict
 	
+def get_vars_in_grid(variables, years):
+	global year_dir
+	return_dict = {}
+	for var in variables:
+		return_dict[var] = []
+	for year in years:
+		year_data = np.load(year_dir + str(year) + '.npy', allow_pickle = True).item()
+		for var in variables:
+			return_dict[var].extend(year_data[var])
+	for var in return_dict.keys():
+		return_dict[var] = np.flip(np.array(return_dict[var]), axis = 0)
+	return return_dict
 	
 	
 	
