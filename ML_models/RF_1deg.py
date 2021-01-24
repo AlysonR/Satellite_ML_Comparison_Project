@@ -14,12 +14,12 @@ import get_day
 
 daily = True
 y_var = 'cf'
-X_vars = ['EIS', 'sst', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500']
+X_vars = ['EIS', 'sst', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500', 'evap']
 print('Getting data')
 
 X = []
 y = []
-years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013]
+years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014]
 print(years[0])
 if daily:
 	features_dict = get_day.get_single_X_y(X_vars, y_var, years[0])
@@ -55,7 +55,7 @@ for area in features_dict.keys():
 	y = np.array(features_dict[area]['y'])
 	print(X.shape)
 	train_X, test_X, train_y, test_y = train_test_split(X, y, test_size = .2, random_state = 37)
-	reg = RandomForestRegressor()
+	reg = RandomForestRegressor(n_estimators = 150, bootstrap = False)
 	reg.fit(train_X, train_y)
 	pred_y = reg.predict(test_X)
 	mse = mean_squared_error(test_y, pred_y)
@@ -68,5 +68,5 @@ for area in features_dict.keys():
 	importances_dict[area]['mse'] = mse
 	importances_dict[area]['r2'] = r
 	print(importances_dict[area])
-	with open('imp_dic.txt', 'wb') as f:
+	with open('imp_dic_evaptest.txt', 'wb') as f:
 		pickle.dump(importances_dict, f)

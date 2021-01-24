@@ -39,7 +39,7 @@ if run:
 	train_X, test_X, train_y, test_y = train_test_split(X, y, test_size = .2, random_state = 37)
 	eval_X, train_X, eval_y, train_y = train_test_split(train_X, train_y, test_size = .2, random_state = 37)
 	
-	bst_1 = lgbm.LGBMRegressor(n_estimators = 1000, learning_rate = .015, objective = objective, boosting = 'goss')
+	bst_1 = lgbm.LGBMRegressor(n_estimators = 200, learning_rate = .015, objective = objective, boosting = 'goss')
 
 	bst_1.fit(train_X, train_y, eval_set = [(eval_X, eval_y), (train_X, train_y)], early_stopping_rounds = 7, verbose = 10)
 

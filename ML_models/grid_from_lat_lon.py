@@ -35,7 +35,7 @@ def make_grid(values, cases):
 
 	
 	for lo_i, la_i, v in zip(lon_indices, lat_indices, values):
-		grid[la_i][lo_i] = v
+		grid[la_i][lo_i] = float(v)
 	
 	return grid, lat, lon
 
