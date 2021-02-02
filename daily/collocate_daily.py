@@ -4,9 +4,10 @@ import datetime
 import get_merra
 import matplotlib.pyplot as plt
 import get_SST
+import get_dundee_sst
 from calendar import monthrange
 
-year = '2003'
+year = '2017'
 for month in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']:
 
 	monthly_dict = {'cwp': [], 'iwp': [], 'cth': [], 'cod': [], 'l_re': [], 'i_re': [], 'cf': [], 'modis_aod': [], 
@@ -31,9 +32,10 @@ for month in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', 
 		merra_dict = get_merra.get_daily(year, month, day, mo_lats, mo_lons)
 		for key in merra_keys:
 			monthly_dict[key].append(merra_dict[key])
+		
 		monthly_dict['sst'].append(get_SST.find_sst(year, month, day, mo_lats, mo_lons))
 		monthly_dict['lats'] = mo_lats
 		monthly_dict['lons'] = mo_lons
 		
-	np.save('npys/{}_{}_test'.format(month, year), monthly_dict)
+	np.save('/gws/nopw/j04/aopp/douglas/{}_{}_test'.format(month, year), monthly_dict)
 	

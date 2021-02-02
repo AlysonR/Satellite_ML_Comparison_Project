@@ -134,15 +134,32 @@ def get_single_X_y(X_vars, y_var, year):
 	
 	return features_dict
 	
-def get_vars_in_grid(variables, years):
+def get_vars_in_N_grid(variables, years, N = 1, remove_nans = False):
 	global year_dir
 	return_dict = {}
+	
+	degraded_lons = np.arange(-179.5, 179.5, N)
+	degraded_lats = np.arange(90, -90, -1 * N)
+	
 	for var in variables:
 		return_dict[var] = []
+	return_dict['lats'] = degraded_lats
+	return_dict['lons'] = degraded_lons
+	
 	for year in years:
 		year_data = np.load(year_dir + str(year) + '.npy', allow_pickle = True).item()
+		
 		for var in variables:
-			return_dict[var].extend(year_data[var])
+			temp = np.array(year_data[var])
+			temp = temp.reshape((temp.shape[0], int(180/N), N, int(360/N), N))
+			temp = np.rollaxis(temp, 2, 4)
+			temp = temp.reshape((temp.shape[0], int(180/N), int(360/N), N**2))
+			temp = np.nanmean(temp, axis = 3)
+			if remove_nans:
+				bad = np.isnan(temp)
+				temp[bad] = 0.
+			
+			return_dict[var].extend(temp)
 	for var in return_dict.keys():
 		return_dict[var] = np.flip(np.array(return_dict[var]), axis = 0)
 	return return_dict

@@ -5,9 +5,9 @@ import glob
 import sys
 
 #Assumes 15 x 15
-
-lat = np.linspace(-90, 90, 181)
-lon = np.linspace(-180, 180, 361)
+resolution = 1
+lat = np.linspace(-90, 90, int(180/resolution) + 1)
+lon = np.linspace(-180, 180, int(360/resolution) + 1)
 
 def get_lat_indices(c_l):
 	global lat
@@ -20,10 +20,14 @@ def get_lon_indices(c_l):
 	return lon_index
 	
 	
-def make_grid(values, cases):
-	global lat, lon
+def make_grid(values, cases, res = 1):
+	global lat, lon, resolution
+	resolution = res
 	v_lats = [float(c.split('_')[0]) for c in cases]
 	v_lons = [float(c.split('_')[1]) for c in cases]
+	
+	lat = np.linspace(-90, 90, int(180/resolution) + 1)
+	lon = np.linspace(-180, 180, int(360/resolution) + 1)
 	
 	calc_lat_indices = np.vectorize(get_lat_indices)
 	calc_lon_indices = np.vectorize(get_lon_indices)

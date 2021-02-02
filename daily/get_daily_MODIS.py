@@ -48,6 +48,7 @@ def get_day(year, month, day):
 	bad = (l_re < -1)
 	l_re[bad] = np.nan
 	
+	
 	#microns
 	i_attrs = modis_data.select('Cloud_Effective_Radius_Ice_Mean').attributes()
 	i_re = modis_data.select('Cloud_Effective_Radius_Ice_Mean').get().astype(float) * i_attrs['scale_factor']

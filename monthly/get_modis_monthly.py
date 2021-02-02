@@ -23,6 +23,7 @@ def get_data(filename):
 	bad = (cod < -5)
 	cod[bad] = np.nan
 	
+	
 	lre = dataset.select('Cloud_Effective_Radius_Liquid_Mean_Mean').get() * dataset.select('Cloud_Effective_Radius_Liquid_Mean_Mean').attributes()['scale_factor']
 	bad = (lre < -1)
 	lre[bad] = np.nan
