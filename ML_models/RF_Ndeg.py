@@ -14,7 +14,7 @@ import get_day
 
 N = 2
 y_var = 'cf'
-X_vars = ['sst', 'EIS', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500']
+X_vars = ['sst', 'EIS', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500', 'CAPE']
 print('Getting data')
 
 X = []
@@ -39,7 +39,7 @@ for area in features_dict.keys():
 	y = np.array(features_dict[area]['y'])
 	print(X.shape)
 	train_X, test_X, train_y, test_y = train_test_split(X, y, test_size = .2, random_state = 37)
-	reg = RandomForestRegressor(n_estimators = 100, max_depth = 25, min_samples_split = 10, bootstrap = True)
+	reg = RandomForestRegressor(n_estimators = 125, min_samples_leaf = 5, max_depth = 25, min_samples_split = 10, bootstrap = True)
 	reg.fit(train_X, train_y)
 	pred_y = reg.predict(test_X)
 	t_pred_y = reg.predict(train_X)

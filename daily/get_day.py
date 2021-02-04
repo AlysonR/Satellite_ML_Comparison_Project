@@ -87,34 +87,6 @@ def get_N_X_y(X_vars, y_var, year, N):
 	temp_X_vars = []
 	return features_dict
 
-def get_large_X_y(X_vars, y_var, years, nr = 24, nc = 24):
-	X = []
-	y = []
-	
-	for year in years:
-		for month in glob.glob('/gws/nopw/j04/aopp/douglas/*_{}_test.npy'.format(year)):
-			month_data = np.load(month, allow_pickle = True).item()
-			collect_xai = []
-			for var in X_vars:
-				temp_xai = []
-				temp_var = np.array(month_data[var])
-				temp_var = temp_var[:, 30:-30, :]
-				for day in range(temp_var.shape[0]):
-					blocked = blockshaped(temp_var[day], nr, nc)
-					temp_xai.extend(blocked)
-				temp_xai = np.array(temp_xai)
-				collect_xai.append(temp_xai)
-			collect_xai = np.array(collect_xai)
-			collect_xai = np.rollaxis(collect_xai, 0, 4)
-			
-	for month in range(len(X[X_vars[0]])):
-		for var in X_vars:
-			temp_blocked = blockshaped(np.array(X[var][month]), nr, nc)
-			
-	
-	
-	
-	return features_dict
 	
 def get_vars_in_N_grid(variables, years, N = 1, remove_nans = False):
 	
@@ -149,7 +121,53 @@ def get_vars_in_N_grid(variables, years, N = 1, remove_nans = False):
 		return_dict[var] = np.flip(np.array(return_dict[var]), axis = 0)
 	return return_dict
 	
+
+def get_large_X_y(X_vars, y_var, years, nr = 40, nc = 40):
+	temp_all = []
+	all_vars = X_vars + [y_var]
+	features_dict = {}
 	
+	for year in years:
+		print(year)
+		for month in glob.glob('/gws/nopw/j04/aopp/douglas/*_{}_test.npy'.format(year)):
+			print(month)
+			month_data = np.load(month, allow_pickle = True).item()
+			collect_xai = []
+			
+			for var in all_vars:
+				temp_xai = []
+				temp_var = np.array(month_data[var])
+				temp_var = temp_var[:, 30:-30, :]
+				for day in range(temp_var.shape[0]):
+					blocked = blockshaped(temp_var[day], nr, nc)
+					temp_xai.extend(blocked)
+					
+				temp_xai = np.array(temp_xai)
+				collect_xai.append(temp_xai)
+			collect_xai = np.array(collect_xai)
+			collect_xai = np.rollaxis(collect_xai, 0, 4)
+			non_nan = []
+			for tile in range(collect_xai.shape[0]):
+				nan_count = np.count_nonzero(np.isnan(collect_xai[tile]))
+				
+				if nan_count/(40**2) < .1:
+					non_nan.extend(collect_xai[tile])
+			
+			bad = np.full(collect_xai.shape, False)
+			for dimension in range(collect_xai.shape[-1]):
+				bad_var = np.isnan(collect_xai[:, :, :, dimension])
+				bad[bad_var] = True
+			collect_xai[bad] = 0.
+			
+			temp_all.extend(collect_xai)
+	temp_all = np.array(temp_all)
+	
+	features_dict['X'] =  temp_all[:, :, :, :-1]
+	features_dict['y'] = temp_all[:, :, :, -1]
+	print(features_dict['X'].shape)
+	
+	
+	return features_dict	
 #from stackoverflow im not above "help"
 def blockshaped(arr, nrows, ncols):
     """

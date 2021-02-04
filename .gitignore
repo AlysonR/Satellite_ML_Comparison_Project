@@ -5,3 +5,7 @@ __pycache__
 *.txt
 *.pyc
 *.sav
+*.nc4
+*.p
+*.pickle
+*.ipynb
