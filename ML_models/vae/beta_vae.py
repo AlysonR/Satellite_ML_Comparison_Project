@@ -1,8 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+print("Num GPUs available", len(tf.config.experimental.list_physical_devices('GPU')))
 from tensorflow.keras import layers
-#from keras.layers import Deconvolution2D
 import matplotlib.pyplot as plt
 import pickle
 import sys
@@ -13,7 +13,9 @@ from sklearn.preprocessing import MinMaxScaler
 import random
 import sample_layer
 
-feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'upper_level_winds', 'CAPE']
+feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'u850', 'evap']
+res = 4
+batch_s = 64
 n_epochs = 10
 vae_gamma = 1000.
 vae_capacity = 25
@@ -29,18 +31,23 @@ class Sampling(layers.Layer):
 		
 	
 #Encoder
-latent_dim = 2
+latent_dim = 3
 
-encoder_inputs = keras.Input(shape = (12, 12, len(feature_names)))
-x = layers.Conv2D(32, 4, activation = 'relu', strides = 2, padding = 'same')(encoder_inputs)
+encoder_inputs = keras.Input(shape = (res, res, len(feature_names)))
+x = layers.Conv2D(16, 4, activation = 'relu', strides = 2, padding = 'same')(encoder_inputs)
+x = layers.Conv2D(32, 4, activation = 'relu', strides = 2, padding = 'same')(x)
 
 x = layers.Flatten()(x)
 x = layers.BatchNormalization()(x)
 x = layers.Activation('relu')(x)
 x = layers.Dense(units = 256)(x)
 x = layers.BatchNormalization()(x)
+
 x = layers.Activation('relu')(x)
-x = layers.Dense(units = latent_dim, activation = 'linear')(x)
+x = layers.Dense(units = 256)(x)
+x = layers.BatchNormalization()(x)
+x = layers.Activation('relu')(x)
+x = layers.Dense(units = latent_dim * 2, activation = 'relu')(x)
 
 z_mean = layers.Dense(latent_dim, activation = 'linear', name = 'z_mean')(x)
 z_log_var = layers.Dense(latent_dim, activation = 'linear', name = 'z_log_var')(x)
@@ -56,13 +63,16 @@ x = layers.BatchNormalization()(x)
 x = layers.Activation('relu')(x)
 x = layers.Dense(units = 256)(x)
 x = layers.BatchNormalization()(x)
+x = layers.Activation('relu')(x)
 
-x = layers.Dense(units = 512, activation = 'relu')(x)
-x = layers.Reshape((-1, 1, 512), input_shape = (512,))(x)
-x = BatchNormalization()(x)
-x = layers.Conv2DTranspose(16, 4, strides = 3, padding = 'same')(x)
+#x = layers.Dense(units = 512, activation = 'relu')(x)
+#x = layers.BatchNormalization()(x)
+x = layers.Reshape((-1, 1, 256), input_shape = (256,))(x)
 
-decoder_outputs = layers.Conv2DTranspose(8, 4, strides = 4, padding = 'same', activation = 'tanh')(x)
+x = layers.Conv2DTranspose(32, 4, strides = 1, padding = 'same')(x)
+x = layers.Conv2DTranspose(16, 4, strides = 2, padding = 'same')(x)
+
+decoder_outputs = layers.Conv2DTranspose(len(feature_names), 4, strides = 2, padding = 'same', activation = 'tanh')(x)
 decoder = keras.Model(latent_inputs, decoder_outputs, name = 'decoder')
 decoder.summary()
 
@@ -92,7 +102,7 @@ class VAE(keras.Model):
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
+                    keras.losses.mean_squared_error(data, reconstruction), axis=(1, 2)
                 )
             )
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
@@ -111,7 +121,7 @@ class VAE(keras.Model):
 
 
 #data_dict = get_day.get_vars_in_N_grid(['cf'], range(2003, 2017), remove_nans = True)
-data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2004), nr = 12, nc = 12)
+data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2019), fill_value = np.nan, nr = res, nc = res)
 features = data_dict['X']
 
 for dimension in range(features.shape[-1]):
@@ -119,42 +129,49 @@ for dimension in range(features.shape[-1]):
 	maximum_value = np.nanmax(features[:, :, :, dimension])
 	test = features[:, :, :, dimension] + minimum_value
 	test = test / (minimum_value + maximum_value)
+	test[np.isnan(test)] = -1
 	features[:, :, :, dimension] = test
-
+data_dict['X'] = features
 assert not np.any(np.isnan(features)), 'nans still in data'
 print(np.count_nonzero(np.isnan(features)), 'make doubly triply quadruply spit on it sure there are no nans')
-
+print(np.nanmin(features), np.nanmax(features))
 vae = VAE(encoder, decoder)
-vae.compile(optimizer = keras.optimizers.Adam())
-history = vae.fit(features, epochs = n_epochs, batch_size = 1)
+vae.compile(optimizer = keras.optimizers.Adam(learning_rate= .0001))
+history = vae.fit(features, epochs = n_epochs, batch_size = batch_s)
 
+def plot_loss(history):
+	a = plt.plot(range(n_epochs), history.history['kl_loss'], c = 'r', label = 'kl')
+	plt.twinx()
+	b = plt.plot(range(n_epochs), history.history['reconstruction_loss'], c = 'b', label = 'reconstruction')
+	plt.savefig('loss_Bvae')
+	plt.clf()
 
-a = plt.plot(range(n_epochs), history.history['kl_loss'], c = 'r', label = 'kl')
-plt.twinx()
-b = plt.plot(range(n_epochs), history.history['reconstruction_loss'], c = 'b', label = 'reconstruction')
-plt.legend([a, b])
-plt.savefig('loss_vae')
-plt.clf()
 #np.save('vae_trained', vae)
 
 def plot_label_clusters(vae, data, labels):
 	print(data.shape, labels.shape)
+	print(np.nanmin(data), np.nanmax(data))
 	z_mean, _, _ = vae.encoder.predict(data)
 	print(z_mean.shape)
-	plt.scatter(z_mean[:, 0], z_mean[:, 1], c = labels)
+	plt.scatter(z_mean[:, 0], z_mean[:, 1], c = labels, vmin = 0, vmax = 1)
 	plt.colorbar()
 	plt.xlabel('z[0]')
 	plt.ylabel('z[1]')
-	plt.savefig('vae_LS')
+	plt.savefig('Bvae_LS')
 	#plt.show()
 def save_LS(vae, data):
 	z_mean, _, _ = vae.encoder.predict(data)
-	with open('vae_ls.pickle', 'wb') as f:
+	with open('Bvae_ls_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
 		pickle.dump([z_mean, np.nanmean(data_dict['y'], axis = (1, 2))], f)
-#save_LS(vae, features)
+	with open('Bvae_model_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
+		pickle.dump(vae, f)
+
+save_LS(vae, features)
 
 sample = random.sample(range(features.shape[0]), 1000)
 
-plot_label_clusters(vae, features['X'][sample], np.nanmean(features['y'][sample], axis = (1, 2)))
+plot_loss(history)
+
+plot_label_clusters(vae, data_dict['X'][sample], np.nanmean(data_dict['y'][sample], axis = (1, 2)))
 
 	

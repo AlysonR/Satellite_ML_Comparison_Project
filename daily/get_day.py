@@ -122,7 +122,7 @@ def get_vars_in_N_grid(variables, years, N = 1, remove_nans = False):
 	return return_dict
 	
 
-def get_large_X_y(X_vars, y_var, years, nr = 40, nc = 40):
+def get_large_X_y(X_vars, y_var, years, fill_value = -100, nr = 40, nc = 40):
 	temp_all = []
 	all_vars = X_vars + [y_var]
 	features_dict = {}
@@ -132,6 +132,8 @@ def get_large_X_y(X_vars, y_var, years, nr = 40, nc = 40):
 		for month in glob.glob('/gws/nopw/j04/aopp/douglas/*_{}_test.npy'.format(year)):
 			print(month)
 			month_data = np.load(month, allow_pickle = True).item()
+			#print(month_data.keys())
+			#sys.exit()
 			collect_xai = []
 			
 			for var in all_vars:
@@ -150,14 +152,14 @@ def get_large_X_y(X_vars, y_var, years, nr = 40, nc = 40):
 			for tile in range(collect_xai.shape[0]):
 				nan_count = np.count_nonzero(np.isnan(collect_xai[tile]))
 				
-				if nan_count/(40**2) < .1:
+				if nan_count/(nr * nc) < .1:
 					non_nan.extend(collect_xai[tile])
 			
 			bad = np.full(collect_xai.shape, False)
 			for dimension in range(collect_xai.shape[-1]):
 				bad_var = np.isnan(collect_xai[:, :, :, dimension])
 				bad[bad_var] = True
-			collect_xai[bad] = 0.
+			collect_xai[bad] = fill_value
 			
 			temp_all.extend(collect_xai)
 	temp_all = np.array(temp_all)

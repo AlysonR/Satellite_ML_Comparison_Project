@@ -22,16 +22,13 @@ for model in models:
 		differences[model].append(np.nanmean(warm_dict[model][area][b'values']))
 
 
-plt.plot([-1, 1], [-1, 1], '--', lw = 2.6, c = 'k')
-
-plt.scatter(differences[b'RF'], differences[b'SGB'], c = model_colors[1], s = 100, label = 'SGB')
-plt.scatter(differences[b'RF'], differences[b'XG'], c = model_colors[-1], s = 100, label = 'XGBoost')
-plt.scatter(differences[b'RF'], differences[b'MVLR'], c = model_colors[2], s = 100, label = 'MVLR')
-
-plt.xlim(-.055, .25)
-plt.ylim(-.1, .25)
-plt.xlabel('Random Forest Derived Change in Cloud Fraction', size = 18)
-plt.ylabel('Other Model Derived Change in Cloud Fraction', size = 18)
+for i, model in enumerate(differences.keys()):
+	points = [x for _, x in sorted(zip(differences[b'RF'], differences[model]))]
+	plt.plot(range(len(differences[model])), points, c = model_colors[i], label = str(model)[2:-1])
+	
+	
+plt.xlabel('Region', size = 18)
+plt.ylabel('Derived Change in Cloud Fraction', size = 18)
 plt.legend(fontsize = 15)
 
 plt.xticks(size = 16)

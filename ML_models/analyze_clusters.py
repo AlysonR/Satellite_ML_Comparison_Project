@@ -17,14 +17,14 @@ mean = True
 std = False
 assert(mean == True or std == True), 'mean or std must be True'
 map_regime = False
-bar_chart = False
-map_grid = False
-features = ['EIS', 'sst', 'RH700', 'AOD','Ang', 'V_250', 'w500', 'evap']
+bar_chart = True
+map_grid = True
+features = ['EIS', 'sst', 'RH700', 'AOD','Ang', 'V_250', 'w500', 'CAPE']
 
 #lwp is called cwp in daily
 variable = 'cwp'
 N = 2
-n_regimes = 13
+n_regimes = 12
 with open('/home/users/rosealyd/ML_sat_obs/ML_models/clusters/sc_{}_{}.pickle'.format(N, n_regimes), 'rb' ) as f:
 	t = pickle.load(f)
 	labels, areas, importances = t[0], t[1], t[2]
@@ -32,6 +32,7 @@ with open('/home/users/rosealyd/ML_sat_obs/ML_models/clusters/sc_{}_{}.pickle'.f
 if bar_chart:
 	bar_dict = {}
 	importances = np.array(importances)
+	print(importances.shape)
 	for n in range(int(n_regimes)):
 		label_mask = (np.array(labels) == n)
 		imp_n = importances[label_mask]

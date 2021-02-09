@@ -12,6 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 import random
 
 feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'upper_level_winds', 'CAPE']
+scaling_dict = {'sst': 305, 'EIS': 20, 'RH700': 1, 'w500': .8, 'tot_aod': 3.5, 'tot_ang': 1.5, 'upper_level_winds': 50, 'CAPE': 6000}
 n_epochs = 10
 class Sampling(layers.Layer):
 	'''Uses (z_mean, z_log_var) to sasmple z, the vector ecoding the cloud feature'''
@@ -76,7 +77,7 @@ class VAE(keras.Model):
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
+                    keras.losses.mean_squared_error(data, reconstruction), axis=(1, 2)
                 )
             )
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
@@ -95,21 +96,27 @@ class VAE(keras.Model):
 
 
 #data_dict = get_day.get_vars_in_N_grid(['cf'], range(2003, 2017), remove_nans = True)
-data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2004), nr = 12, nc = 12)
+data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2004),fill_value = np.nan, nr = 12, nc = 12)
 features = data_dict['X']
+
 
 for dimension in range(features.shape[-1]):
 	minimum_value = np.nanmin(features[:, :, :, dimension]) * -1
 	maximum_value = np.nanmax(features[:, :, :, dimension])
+	maximum_value = scaling_dict[feature_names[dimension]]	
 	test = features[:, :, :, dimension] + minimum_value
 	test = test / (minimum_value + maximum_value)
+	test[np.isnan(test)] = -100
 	features[:, :, :, dimension] = test
+
+	
+		 
 
 assert not np.any(np.isnan(features)), 'nans still in data'
 print(np.count_nonzero(np.isnan(features)), 'make doubly triply quadruply spit on it sure there are no nans')
 
 vae = VAE(encoder, decoder)
-vae.compile(optimizer = keras.optimizers.Adamax(learning_rate = .000001))
+vae.compile(optimizer = keras.optimizers.Adamax())
 history = vae.fit(features, epochs = n_epochs, batch_size = 1)
 
 

@@ -11,7 +11,7 @@ res = 2
 with open('imp_dic_{}.txt'.format(res), 'rb') as f:
 	importances_dict = pickle.load(f)
 
-#X_vars = ['EIS', 'sst', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500', 'evap']
+#X_vars = ['EIS', 'sst', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500', 'evap', 'CAPE']
 
 #number regimes (1x1, 13; 4x4, 7)
 
@@ -48,14 +48,14 @@ sys.exit()
 
 print(importances.shape)
 print('fitting')
-n = 13
+n = 12
 #clustering = AgglomerativeClustering(n_clusters = n, compute_full_tree = True)
 #clustering = KMeans(n_clusters = n, max_iter = 1000, verbose = 10, tol = 1e-7)
-clustering = SpectralClustering(n_clusters = n, degree = 3, n_init = 30, assign_labels = 'discretize')
+clustering = SpectralClustering(n_clusters = n, degree = 3, n_init = 50, assign_labels = 'discretize')
 clustering.fit(importances)
 labels = clustering.labels_
 
-with open('sc_{}_{}.pickle'.format(res, n), 'wb') as f:
+with open('./clusters/sc_{}_{}.pickle'.format(res, n), 'wb') as f:
 	pickle.dump([labels, areas, importances], f)
 #np.save('evap_kmeans_{}'.format(n), [labels, areas, importances])
 
