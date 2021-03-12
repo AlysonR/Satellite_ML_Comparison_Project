@@ -17,15 +17,16 @@ mean = True
 std = False
 assert(mean == True or std == True), 'mean or std must be True'
 map_regime = False
-bar_chart = True
-map_grid = True
-features = ['EIS', 'sst', 'RH700', 'AOD','Ang', 'V_250', 'w500', 'CAPE']
+bar_chart = False
+map_grid = False
+features = ['EIS', 'sst', 'RH700', 'AOD','Ang', 'V_250', 'w500', 'evap']
 
 #lwp is called cwp in daily
-variable = 'cwp'
+variable = 'cth'
 N = 2
-n_regimes = 12
-with open('/home/users/rosealyd/ML_sat_obs/ML_models/clusters/sc_{}_{}.pickle'.format(N, n_regimes), 'rb' ) as f:
+n_regimes = 13
+#with open('/home/users/rosealyd/ML_sat_obs/ML_models/clusters/kmeans_{}_{}.pickle'.format(N, n_regimes), 'rb' ) as f:
+with open('/home/users/rosealyd/ML_sat_obs/ML_models/clusters/current_regimes_{}.pickle'.format(N), 'rb') as f:
 	t = pickle.load(f)
 	labels, areas, importances = t[0], t[1], t[2]
 
@@ -59,7 +60,7 @@ if map_grid:
 	plt.show()
 	sys.exit()
 #analyze_dict = get_year.get_vars_in_N_grid([variable], range(2003, 2016), N = N)
-analyze_dict = get_day.get_vars_in_N_grid([variable], range(2003, 2017), N = N)
+analyze_dict = get_day.get_vars_in_N_grid([variable], range(2003, 2020), N = N)
 
 cluster_dict = {}
 
@@ -103,7 +104,7 @@ if map_regime:
 
 for n in [8, 10, 11]:
 	print(n)
-	plt.hist(cluster_dict[n][variable], bins = np.linspace(30, 400, 40), color = regime_list[n], lw = 3.5, histtype = 'step', weights = [1./len(cluster_dict[n][variable]) for p in cluster_dict[n][variable]])
+	plt.hist(cluster_dict[n][variable], bins = np.linspace(.7, 10, 40), color = regime_list[n], lw = 3.5, histtype = 'step', weights = [1./len(cluster_dict[n][variable]) for p in cluster_dict[n][variable]])
 	
 	mean = np.nanmean(cluster_dict[n][variable])
 	plt.plot([mean, mean], [0, .3], '--', c = regime_list[n], lw = 3)
@@ -111,9 +112,9 @@ for n in [8, 10, 11]:
 	plt.xticks(size = 14)
 	yts = np.linspace(0, .3, 5)
 	plt.yticks(yts, ['{}%'.format(int(y * 100)) for y in yts], size = 14)
-	plt.xlabel('Liquid Water Path', size = 20)
+	plt.xlabel('Cloud Top Height (m)', size = 20)
 	plt.ylim(0, .3)
-plt.show()
+plt.savefig('cth_2ncluster')
 
 	
 	

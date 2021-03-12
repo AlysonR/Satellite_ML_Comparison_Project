@@ -5,9 +5,11 @@ from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 import cmap
 from skimage.metrics import structural_similarity as ssim
+import matplotlib.pyplot as plt
+plt.rcParams["figure.figsize"] = (15, 8)
 
 brmap = cmap.get_rbluemap()
-warm_dict = np.load('PIAI_12.npy', allow_pickle = True, encoding = 'bytes').item()
+warm_dict = np.load('PIAI_96.npy', allow_pickle = True, encoding = 'bytes').item()
 model_colors = ['#20ab2e', '#4042c7', '#bc87e8', '#ab2020']
 
 models = list(warm_dict.keys())
@@ -20,9 +22,10 @@ for model in models:
 	clean_cf[model] = []
 for model in models:
 	for area in regions:
-		
-		clean_cf[model].append(np.nanmean(warm_dict[model][area][b'clean_cf']) * 100)
-
+		try:
+			clean_cf[model].append(np.nanmean(warm_dict[model][area][b'clean_cf']) * 100)
+		except KeyError:
+			clean_cf[model].append(np.nan)
 
 for i, model in enumerate(clean_cf.keys()):
 	
@@ -40,11 +43,13 @@ for i, model in enumerate(clean_cf.keys()):
 	
 	plt.pcolormesh(lons, lats, grid, cmap = brmap, norm = cmap.MidpointNormalize(midpoint=0.), vmin = 0, vmax = 100)
 	plt.title('{}\n'.format(model_names[i]), weight = 'semibold', size = 24, color = model_colors[i])
-	plt.subplots_adjust(left = .07, top = .85)
+	plt.subplots_adjust(left = .07, top = .95, bottom = .01)
 	print(round(np.nanmean(grid), 1))
 	ticks = [0, 25, 50, 75, 100]
-	cbar = plt.colorbar( fraction = .07, pad = .08)
+	labels = ['{}%'.format(p) for p in ticks]
+	cbar = plt.colorbar(ticks = ticks, fraction = .025, pad = .08)
 	cbar.ax.tick_params(labelsize = 18)
+	cbar.set_ticklabels(labels)
 	cbar.set_label('Simulated Pristine Cloud Fraction', size = 20)
 	plt.show()
 

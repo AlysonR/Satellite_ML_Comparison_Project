@@ -5,7 +5,6 @@ from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 import cmap
 import math
-from skimage.metrics import structural_similarity as ssim
 plt.rcParams["figure.figsize"] = (15, 8)
 
 brcmap = cmap.get_cmap()
@@ -49,9 +48,7 @@ for area in regions:
 	
 sa_area_weight = np.array(sa_area_weight)/sa_earth
 
-weights_local = np.array(weights_local)/np.nansum(weights_local)
-
-grids_dict = {}		
+weights_local = np.array(weights_local)/np.nansum(weights_local)		
 for i, model in enumerate(differences.keys()):
 	print(model)
 	grid, lats, lons = grid_from_lat_lon.make_grid(differences[model], areas)
@@ -74,9 +71,6 @@ for i, model in enumerate(differences.keys()):
 	print(np.nanmin(grid), np.nanmax(grid))
 	print(np.nanmin(occurrence), np.nanmax(occurrence))
 	
-	#grid[np.isnan(grid)] = 0
-	#grids_dict[model] = grid
-	
 	
 	m = Basemap(projection = 'cyl', llcrnrlat=-90,urcrnrlat=90,  llcrnrlon=-180, urcrnrlon=180, resolution = 'c')
 	m.fillcontinents(color = '#005C1F', lake_color = '#005C1F')
@@ -88,23 +82,16 @@ for i, model in enumerate(differences.keys()):
 	meridians = [-180, -90, 0, 90, 180]
 	m.drawmeridians(meridians, labels = [True for b in meridians], dashes = [100,.0000001], fontsize = 18)
 	
-	min_c = -2
-	max_c = 8
+	min_c = -.02
+	max_c = .005
 	
-	plt.pcolormesh(lons, lats, grid, cmap = brcmap, norm = cmap.MidpointNormalize(midpoint=0.), vmin = min_c, vmax = max_c)
+	plt.pcolormesh(lons, lats, forcings_grid, cmap = brcmap, norm = cmap.MidpointNormalize(midpoint=0.), vmin = min_c, vmax = max_c)
 	plt.title(model_names[i] + '\n', weight = 'semibold', size = 24, color = model_colors[i])
 	plt.subplots_adjust(left = .07, top = .85)
 	
-	ticks = [-2, 0, 2, 4, 6, 8]
-	labels = ['{} %'.format(p) for p in ticks]
+	ticks = [-.02, -.015, -.01, -.005, 0, .005]
 	cbar = plt.colorbar(ticks = ticks, fraction = .07, pad = .08)
-	cbar.set_ticklabels(labels)
 	cbar.ax.tick_params(labelsize = 18)
-	cbar.set_label('Weighted Change in Cloud Fraction', size = 20)
+	cbar.set_label('Change in Shortwave Forcing', size = 20)
 	plt.show()
 	
-'''for model1 in models:
-	for model2 in models:
-		print(model1, model2, ssim(grids_dict[model1], grids_dict[model2]))
-		
-'''	

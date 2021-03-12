@@ -14,10 +14,11 @@ import random
 import sample_layer
 
 feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'u850', 'evap']
+feature_names = ['EIS', 'RH700']
 res = 4
 batch_s = 64
-n_epochs = 10
-vae_gamma = 1000.
+n_epochs = 20
+vae_gamma = 10
 vae_capacity = 25
 class Sampling(layers.Layer):
 	'''Uses (z_mean, z_log_var) to sasmple z, the vector ecoding the cloud feature'''
@@ -31,7 +32,7 @@ class Sampling(layers.Layer):
 		
 	
 #Encoder
-latent_dim = 3
+latent_dim = 2
 
 encoder_inputs = keras.Input(shape = (res, res, len(feature_names)))
 x = layers.Conv2D(16, 4, activation = 'relu', strides = 2, padding = 'same')(encoder_inputs)
@@ -39,10 +40,6 @@ x = layers.Conv2D(32, 4, activation = 'relu', strides = 2, padding = 'same')(x)
 
 x = layers.Flatten()(x)
 x = layers.BatchNormalization()(x)
-x = layers.Activation('relu')(x)
-x = layers.Dense(units = 256)(x)
-x = layers.BatchNormalization()(x)
-
 x = layers.Activation('relu')(x)
 x = layers.Dense(units = 256)(x)
 x = layers.BatchNormalization()(x)
@@ -75,7 +72,6 @@ x = layers.Conv2DTranspose(16, 4, strides = 2, padding = 'same')(x)
 decoder_outputs = layers.Conv2DTranspose(len(feature_names), 4, strides = 2, padding = 'same', activation = 'tanh')(x)
 decoder = keras.Model(latent_inputs, decoder_outputs, name = 'decoder')
 decoder.summary()
-
 
 class VAE(keras.Model):
     def __init__(self, encoder, decoder, **kwargs):
@@ -121,7 +117,7 @@ class VAE(keras.Model):
 
 
 #data_dict = get_day.get_vars_in_N_grid(['cf'], range(2003, 2017), remove_nans = True)
-data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2019), fill_value = np.nan, nr = res, nc = res)
+data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2020), fill_value = -100, nr = res, nc = res)
 features = data_dict['X']
 
 for dimension in range(features.shape[-1]):
@@ -132,11 +128,12 @@ for dimension in range(features.shape[-1]):
 	test[np.isnan(test)] = -1
 	features[:, :, :, dimension] = test
 data_dict['X'] = features
+ 
 assert not np.any(np.isnan(features)), 'nans still in data'
 print(np.count_nonzero(np.isnan(features)), 'make doubly triply quadruply spit on it sure there are no nans')
 print(np.nanmin(features), np.nanmax(features))
 vae = VAE(encoder, decoder)
-vae.compile(optimizer = keras.optimizers.Adam(learning_rate= .0001))
+vae.compile(optimizer = keras.optimizers.Adam())
 history = vae.fit(features, epochs = n_epochs, batch_size = batch_s)
 
 def plot_loss(history):
@@ -163,8 +160,8 @@ def save_LS(vae, data):
 	z_mean, _, _ = vae.encoder.predict(data)
 	with open('Bvae_ls_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
 		pickle.dump([z_mean, np.nanmean(data_dict['y'], axis = (1, 2))], f)
-	with open('Bvae_model_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
-		pickle.dump(vae, f)
+	#with open('Bvae_model_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
+		#pickle.dump(vae, f)
 
 save_LS(vae, features)
 

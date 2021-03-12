@@ -10,10 +10,14 @@ import get_day
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 import random
+from keras.datasets import mnist
+from sklearn.utils import shuffle
 
-feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'upper_level_winds', 'CAPE']
-scaling_dict = {'sst': 305, 'EIS': 20, 'RH700': 1, 'w500': .8, 'tot_aod': 3.5, 'tot_ang': 1.5, 'upper_level_winds': 50, 'CAPE': 6000}
-n_epochs = 10
+feature_names = ['sst', 'EIS', 'RH700', 'w500', 'tot_aod', 'tot_ang', 'u850', 'evap']
+feature_names = ['sst', 'EIS', 'RH700', 'tot_aod']
+n_epochs = 15
+b_size = 16
+res = 6
 class Sampling(layers.Layer):
 	'''Uses (z_mean, z_log_var) to sasmple z, the vector ecoding the cloud feature'''
 	
@@ -29,10 +33,12 @@ class Sampling(layers.Layer):
 	
 latent_dim = 2
 
-encoder_inputs = keras.Input(shape = (12, 12, len(feature_names)))
-x = layers.Conv2D(32, 3, activation = 'relu', strides = 2, padding = 'same')(encoder_inputs)
+encoder_inputs = keras.Input(shape = (res, res, len(feature_names)))
+x = layers.Conv2D(32, 3, activation = 'relu', strides = 3, padding = 'same')(encoder_inputs)
 x = layers.Conv2D(64, 3, activation = 'relu', strides = 2, padding = 'same')(x)
+
 x = layers.Flatten()(x)
+x = layers.Dense(32, activation = 'relu')(x)
 x = layers.Dense(16, activation = 'relu')(x)
 
 z_mean = layers.Dense(latent_dim, name = 'z_mean')(x)
@@ -44,13 +50,15 @@ encoder.summary()
 
 #Decoder
 latent_inputs = keras.Input(shape=(latent_dim,))
-x = layers.Dense(3 * 3 * 64, activation = 'relu')(latent_inputs)
-x = layers.Reshape((3, 3, 64))(x)
-x = layers.Conv2DTranspose(64, 3, activation = 'relu', strides = 2, padding = 'same')(x)
-x = layers.Conv2DTranspose(32, 3, activation = 'relu', strides = 2, padding = 'same')(x)
+x = layers.Dense(16, activation = 'relu')(latent_inputs)
+x = layers.Dense(32, activation = 'relu')(x)
+x = layers.Dense(2 * 2 * 64, activation = 'relu')(x)
+x = layers.Reshape((2, 2, 64))(x)
+x = layers.Conv2DTranspose(32, 3, activation = 'relu', strides = 3, padding = 'same')(x)
 decoder_outputs = layers.Conv2DTranspose(len(feature_names), 3, activation = 'sigmoid', padding = 'same')(x)
 decoder = keras.Model(latent_inputs, decoder_outputs, name = 'decoder')
 decoder.summary()
+
 
 class VAE(keras.Model):
     def __init__(self, encoder, decoder, **kwargs):
@@ -95,38 +103,39 @@ class VAE(keras.Model):
         }
 
 
-#data_dict = get_day.get_vars_in_N_grid(['cf'], range(2003, 2017), remove_nans = True)
-data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2004),fill_value = np.nan, nr = 12, nc = 12)
+
+data_dict = get_day.get_large_X_y(feature_names, 'cf', range(2003, 2020), fill_value = -1, nr = res, nc = res)
 features = data_dict['X']
 
 
 for dimension in range(features.shape[-1]):
 	minimum_value = np.nanmin(features[:, :, :, dimension]) * -1
 	maximum_value = np.nanmax(features[:, :, :, dimension])
-	maximum_value = scaling_dict[feature_names[dimension]]	
 	test = features[:, :, :, dimension] + minimum_value
 	test = test / (minimum_value + maximum_value)
-	test[np.isnan(test)] = -100
+	test[np.isnan(test)] = -1
 	features[:, :, :, dimension] = test
-
+data_dict['X'] = features
 	
 		 
 
 assert not np.any(np.isnan(features)), 'nans still in data'
 print(np.count_nonzero(np.isnan(features)), 'make doubly triply quadruply spit on it sure there are no nans')
+features = shuffle(features)
+
 
 vae = VAE(encoder, decoder)
-vae.compile(optimizer = keras.optimizers.Adamax())
-history = vae.fit(features, epochs = n_epochs, batch_size = 1)
+vae.compile(optimizer = keras.optimizers.Adam())
+history = vae.fit(features, epochs = n_epochs, batch_size = b_size)
 
 
-a = plt.plot(range(n_epochs), history.history['kl_loss'], c = 'r', label = 'kl')
-plt.twinx()
-b = plt.plot(range(n_epochs), history.history['reconstruction_loss'], c = 'b', label = 'reconstruction')
-plt.legend([a, b])
-plt.savefig('loss_vae')
-plt.clf()
-#np.save('vae_trained', vae)
+def plot_loss(history):
+	a = plt.plot(range(n_epochs), history.history['kl_loss'], c = 'r', label = 'kl')
+	plt.twinx()
+	b = plt.plot(range(n_epochs), history.history['reconstruction_loss'], c = 'b', label = 'reconstruction')
+
+	plt.savefig('loss_vae')
+	plt.clf()
 
 def plot_label_clusters(vae, data, labels):
 	print(data.shape, labels.shape)
@@ -137,15 +146,18 @@ def plot_label_clusters(vae, data, labels):
 	plt.xlabel('z[0]')
 	plt.ylabel('z[1]')
 	plt.savefig('vae_LS')
-	#plt.show()
+	
 def save_LS(vae, data):
 	z_mean, _, _ = vae.encoder.predict(data)
-	with open('vae_ls.pickle', 'wb') as f:
+	with open('vae_ls_{}_{}.pickle'.format(latent_dim, n_epochs), 'wb') as f:
 		pickle.dump([z_mean, np.nanmean(data_dict['y'], axis = (1, 2))], f)
-#save_LS(vae, features)
+save_LS(vae, features)
 
-sample = random.sample(range(features.shape[0]), 1000)
+plot_loss(history)
 
-plot_label_clusters(vae, features['X'][sample], np.nanmean(features['y'][sample], axis = (1, 2)))
+sample = list(random.sample(range(features.shape[0]), 1000))
+print(sample)
+print(data_dict['X'][sample])
 
-	
+plot_label_clusters(vae, data_dict['X'][sample], np.nanmean(data_dict['y'], axis = (1, 2))[sample])
+

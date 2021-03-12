@@ -4,10 +4,24 @@ from pyhdf.SD import SD, SDC
 import matplotlib.pyplot as plt
 import sys
 import numpy as np
+from netCDF4 import Dataset
 
 alpha = .25
 
 modis_daily_dir = '/gws/nopw/j04/eo_shared_data_vol1/satellite/modis/modis_c61/mod08_d3/'
+
+def get_Nd(date):
+	Nd_dir = '/badc/deposited2018/grosvenor_modis_droplet_conc/data/'
+	Nd_filename = glob.glob(Nd_dir + '*_{}_*.nc'.format(date.year))[0]
+	Nd_data = Dataset(Nd_filename, mode = 'r')
+	lats = Nd_data['lat'][:]
+	lons = Nd_data['lon'][:]
+	Nd = Nd_data['Nd'][:]
+	day_in_year = int(date.strftime('%j')) -1
+	Nd = np.rollaxis(Nd[:, :, day_in_year], axis = 1)
+	return Nd
+get_Nd(datetime.date(year = 2007, month = 1, day = 1))
+
 
 def get_day(year, month, day):
 	global alpha, modis_daily_dir
@@ -15,7 +29,7 @@ def get_day(year, month, day):
 	date = datetime.date(year = int(year), month = int(month), day = int(day))
 	diy = date.strftime('%j')
 	filename = glob.glob(modis_daily_dir + '*A{}{}*.hdf'.format(year, diy))[0]
-	print(filename)
+	print(filename, 'getting modis')
 	
 	modis_data = SD(filename, SDC.READ)
 	
@@ -84,6 +98,13 @@ def get_day(year, month, day):
 	cdnc = (cod / ((cwp ** (5/6)) * alpha)) ** 3
 	cdnc[(cdnc < 1)] = np.nan
 	
-	modis_dict = {'cwp': cwp, 'iwp': iwp, 'cth': cth, 'cod': cod, 'l_re': l_re, 'i_re': i_re, 'cf': cf, 'modis_aod': aod, 'ml_frac': ml_frac, 'ml_ice_frac': ml_ice_frac, 'ml_liq_frac': ml_liq_frac, 'd_ctoaer': dis_c_aer}
+	try:
+		Nd = get_Nd(date)
+	except:
+		Nd = np.empty((360, 180))
+		Nd.fill(np.nan)
+	
+	modis_dict = {'Nd': Nd, 'cwp': cwp, 'iwp': iwp, 'cth': cth, 'cod': cod, 'l_re': l_re, 'i_re': i_re, 'cf': cf, 'modis_aod': aod, 'ml_frac': ml_frac, 'ml_ice_frac': ml_ice_frac, 'ml_liq_frac': ml_liq_frac, 'd_ctoaer': dis_c_aer}
 	
 	return modis_latitudes, modis_longitudes, modis_dict
+

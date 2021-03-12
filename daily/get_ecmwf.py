@@ -21,7 +21,7 @@ def get_ecmwf(year, month, day):
 		t2m = cape_data['T2'][:][0, 0, :, :]
 		daily_t2.append(t2m)
 		daily_cape.append(cape)
-		
+	
 	daily_cape = np.nanmean(daily_cape, axis = 0)
 	daily_t2 = np.nanmean(daily_t2, axis = 0)
 	
@@ -38,4 +38,4 @@ def get_ecmwf(year, month, day):
 	return daily_cape, daily_t2
 
 	
-#get_ecmwf(2007, '01', '01')
+get_ecmwf(2007, '01', '01')

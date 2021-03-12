@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import cmap
 
 brcmap = cmap.get_cmap()
-warm_dict = np.load('PIAI_12.npy', allow_pickle = True, encoding = 'bytes').item()
+warm_dict = np.load('PIAI_96.npy', allow_pickle = True, encoding = 'bytes').item()
 model_colors = ['#20ab2e', '#4042c7', '#bc87e8', '#ab2020']
 
 models = list(warm_dict.keys())
@@ -25,6 +25,7 @@ for model in models:
 for i, model in enumerate(differences.keys()):
 	
 	grid, lats, lons = grid_from_lat_lon.make_grid(differences[model], areas)
+	print(np.nanmin(grid), np.nanmax(grid))
 	m = Basemap(projection = 'cyl', llcrnrlat=-90,urcrnrlat=90,  llcrnrlon=-180, urcrnrlon=180, resolution = 'c')
 	m.fillcontinents(color = '#005C1F', lake_color = '#005C1F')
 	m.drawcoastlines()

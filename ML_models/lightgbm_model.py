@@ -11,7 +11,7 @@ sys.path.append('/home/users/rosealyd/ML_sat_obs/monthly/')
 import get_year
 
 y_var = 'cf'
-X_variables = ['sst', 'EIS', 'tot_aod','tot_ang', 'w500', 'RH850', 'upper_level_winds']
+X_variables = ['sst', 'EIS', 'tot_aod','tot_ang', 'w500', 'RH850', 'upper_level_winds', 'evap', 'u850']
 years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
 objective = 'mse'
 run = True

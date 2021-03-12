@@ -4,6 +4,63 @@ import sys
 import copy
 import matplotlib.pyplot as plt
 import daily_tools
+import sys
+import copy
+
+
+def get_global_X_y(X_vars, y_var, year, get_lat_lon = False):
+	months = glob.glob('/gws/nopw/j04/aopp/douglas/*_{}_test.npy'.format(year))
+	features_dict = {}
+	for key in X_vars:
+		features_dict[key] = []
+	features_dict['latlons'] = []
+	ys = []
+		
+	for month in months:
+		month_data = np.load(month, allow_pickle = True).item()
+		lats = month_data['lats']
+		lons = month_data['lons']
+		ll_grid = np.zeros((lats.shape[0], lons.shape[0])).tolist()
+		for lat in range(lats.shape[0]):
+			for lon in range(lons.shape[0]):
+				ll_grid[lat][lon] = [lat, lon]
+		ll_grid = np.array(ll_grid)
+	
+		for var in X_vars:
+			for day in month_data[var]:
+				features_dict[var].extend(day.flatten())
+		if get_lat_lon:
+			for day in range(len(month_data['sst'])):
+				features_dict['latlons'].extend(ll_grid.flatten())
+		for day in month_data[y_var]:
+			ys.extend(day.flatten())
+			
+	Xs = []
+	goods = 0
+	for feature in features_dict.keys():
+		good = np.where(~np.isnan(features_dict[feature]) == True)[0]
+		
+		if type(goods) == int:
+			print('setting goods')
+			goods = copy.deepcopy(good)
+		else:
+			print('getting intersection')
+			goods = np.intersect1d(goods, good)
+		
+		features_dict[feature] = np.array(features_dict[feature])
+	ys = np.array(ys)
+	ygood = np.where(~np.isnan(ys) == True)[0]
+	goods = np.intersect1d(goods, ygood)
+	
+	for feature in features_dict.keys():
+		Xs.append(features_dict[feature][goods])
+	ys = ys[goods]
+	Xs = np.rollaxis(np.array(Xs), 1)
+	if True in np.isnan(Xs):
+		print('you failed')
+	if True in np.isnan(ys):
+		print('you failed ys')
+	return Xs, ys
 
 def get_single_X_y(X_vars, y_var, year):
 	months = glob.glob('/gws/nopw/j04/aopp/douglas/*_{}_test.npy'.format(year))
@@ -26,11 +83,16 @@ def get_single_X_y(X_vars, y_var, year):
 					for feature in X_vars:
 						temp_xai.append(month_data[feature][day][n_row][n_tile])
 					
-					if True not in np.isnan(temp_xai) and True not in np.isnan([month_data[y_var][day][n_row][n_tile]]):
+					if (True not in np.isnan(temp_xai)) and (True not in np.isnan([month_data[y_var][day][n_row][n_tile]])):
 						features_dict['{}_{}'.format(lat, lon)]['X'].append(temp_xai)
 						features_dict['{}_{}'.format(lat, lon)]['y'].append(month_data[y_var][day][n_row][n_tile])
+						
 	print(np.array(features_dict['0.5_0.5']['X']).shape)
+	print(features_dict['0.5_0.5']['X'][0])
 	return features_dict
+
+#get_single_X_y(['sst', 'EIS', 'cf', 'cwp'], 'cf', 2004)
+
 	
 def get_N_X_y(X_vars, y_var, year, N):
 	assert (180%N == 0), 'Not divisible grid number'

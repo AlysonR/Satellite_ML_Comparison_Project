@@ -36,8 +36,6 @@ def make_grid(values, cases, res = 15):
 
 	lon_indices = calc_lon_indices(v_lons)
 	lat_indices = calc_lat_indices(v_lats)
-	print(len(lat_indices))
-	print(len(lon_indices))
 	
 	grid = [[np.nan for i in range(len(lon)-1)] for j in range(len(lat)-1)]
 

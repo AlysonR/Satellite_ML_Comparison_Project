@@ -8,7 +8,7 @@ from sklearn.metrics import explained_variance_score
 import cmap
 
 res = 2
-with open('imp_dic_{}.txt'.format(res), 'rb') as f:
+with open('./imp_dics/imp_dic_1613144890_2.txt', 'rb') as f:
 	importances_dict = pickle.load(f)
 
 #X_vars = ['EIS', 'sst', 'RH700', 'tot_aod','tot_ang', 'upper_level_winds', 'w500', 'evap', 'CAPE']
@@ -19,13 +19,20 @@ importances = []
 fits = []
 areas = []
 lons = []
+print(sorted(importances_dict.keys()))
+
+x_vars = importances_dict.pop('features')
+y_var = importances_dict.pop('target')
+print(sorted(importances_dict.keys()))
 for key in importances_dict.keys():
 	importances.append(importances_dict[key]['imps'])
 	#importances.append([p for i, p in enumerate(importances_dict[key]['imps']) if i not in [4]])
 	fits.append(importances_dict[key]['r2'])
 	areas.append(key)
 	lons.append(float(key.split('_')[1]))
-
+print(np.nanmean(fits))
+plt.hist(fits)
+plt.show()
 importances = np.array(importances)
 print(importances.shape)
 fits_grid, lats, lons = grid_from_lat_lon.make_grid(fits, areas, res = res)
@@ -42,13 +49,13 @@ for n in range(3, 15):
 	temps.append(float(clustering.inertia_))
 plt.scatter(range(3, 15), temps)
 plt.show()
-sys.exit()
-'''
+sys.exit()'''
+
 
 
 print(importances.shape)
 print('fitting')
-n = 12
+n = 13
 #clustering = AgglomerativeClustering(n_clusters = n, compute_full_tree = True)
 #clustering = KMeans(n_clusters = n, max_iter = 1000, verbose = 10, tol = 1e-7)
 clustering = SpectralClustering(n_clusters = n, degree = 3, n_init = 50, assign_labels = 'discretize')

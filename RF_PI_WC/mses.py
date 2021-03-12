@@ -3,7 +3,8 @@ import sys
 import grid_from_lat_lon
 import matplotlib.pyplot as plt
 
-warm_dict = np.load('PIAI_12.npy', allow_pickle = True, encoding = 'bytes').item()
+
+warm_dict = np.load('PIAI_96.npy', allow_pickle = True, encoding = 'bytes').item()
 model_colors = ['#20ab2e', '#4042c7', '#bc87e8', '#ab2020']
 #if train do train error otherwise test error
 train_error = False
@@ -19,9 +20,11 @@ for model in models:
 		else:
 			errors[model].append(np.nanmean(warm_dict[model][area][b'mses']) * 100)
 if train_error:	
-	bins = np.linspace(0, .36, 20)
+	#bins = np.linspace(0, .03, 20)
+	bins = np.linspace(0, 13, 50)
 else:
-	bins = np.linspace(.17, 1.5, 20)
+	bins = np.linspace(0, .5, 30)
+	#bins = np.linspace(0, 14, 50)
 #for i, model in enumerate(errors.keys()):
 for i, model in zip([0, 1, 3], [b'RF', b'SGB', b'XG']):
 	print(model)
